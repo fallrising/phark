@@ -1,0 +1,57 @@
+# Stream Deck 文檔索引
+
+本目錄記錄 **phark** 專案的完整目標、架構與操作指南，供開發者或其他 LLM 接手時參考。
+
+| 文檔 | 內容 |
+|------|------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | 部署藍圖、技術決策、與 Kubernetes 對照、SQLite 界線 |
+| [DEVELOPMENT.md](./DEVELOPMENT.md) | 專案結構、本地開發、API 規格、環境變數、測試 |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | VPS 從零到上線的完整步驟（Docker、Traefik、GHCR、CI/CD） |
+
+## 部署模板
+
+可複製到 VPS 或 GitHub 的設定檔位於 [`deploy/templates/`](../deploy/templates/)：
+
+```
+deploy/templates/
+├── edge/compose.yml          # Traefik 路由層
+├── edge/.env.example
+├── deck/compose.yml          # 應用服務
+├── deck/.env.example
+├── scripts/deploy-deck         # 具回滾的部署腳本
+├── scripts/deploy-deck-ssh     # SSH forced-command wrapper
+└── github/workflows/ci-cd.yml  # GitHub Actions（待加入 repo）
+```
+
+## 專案常數（請依實際環境替換）
+
+| 項目 | 預設值 |
+|------|--------|
+| GitHub repository | `fallrising/phark` |
+| Container registry | `ghcr.io/fallrising/phark` |
+| 應用名稱 | `deck` |
+| 網域 | `deck.example.com` |
+| VPS 部署使用者 | `deploy` |
+| 應用資料目錄 | `/opt/apps/deck/data` |
+| SQLite 路徑（容器內） | `/data/deck.db` |
+| 容器執行 UID/GID | `10001` |
+
+## 里程碑狀態
+
+**已完成（應用程式里程碑）**
+
+- [x] 單體 Spring Boot + React 應用
+- [x] Dockerfile multi-stage build
+- [x] Backend / Frontend 測試與 lint
+- [x] 根目錄 README 基本操作說明
+
+**待完成（部署里程碑）**
+
+- [ ] VPS 安裝 Docker Engine 與 Compose
+- [ ] Traefik 路由層（`edge-traefik` healthy）
+- [ ] GHCR 推送與 VPS 拉取
+- [ ] GitHub Actions CI/CD
+- [ ] 部署腳本與 SSH forced command
+- [ ] HTTPS 上線驗收
+
+詳細驗收清單見 [DEPLOYMENT.md#第一輪完成標準](./DEPLOYMENT.md#第一輪完成標準)。
