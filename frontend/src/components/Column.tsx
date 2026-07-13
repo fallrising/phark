@@ -1,0 +1,33 @@
+import { PostCard } from "@/components/PostCard"
+import type { Channel, Post } from "@/types/post"
+
+const CHANNEL_LABELS: Record<Channel, string> = {
+  home: "Home",
+  tech: "Tech",
+  ops: "Ops",
+}
+
+interface ColumnProps {
+  channel: Channel
+  posts: Post[]
+}
+
+export function Column({ channel, posts }: ColumnProps) {
+  return (
+    <section className="flex h-full min-w-[280px] flex-1 flex-col rounded-2xl border border-border/70 bg-muted/30 md:min-w-0">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-muted/60 px-4 py-3 backdrop-blur">
+        <h2 className="text-sm font-semibold tracking-wide text-foreground">
+          {CHANNEL_LABELS[channel]}
+        </h2>
+        <p className="text-xs text-muted-foreground">{posts.length} posts</p>
+      </header>
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+        {posts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No posts yet.</p>
+        ) : (
+          posts.map((post) => <PostCard key={post.id} post={post} />)
+        )}
+      </div>
+    </section>
+  )
+}
