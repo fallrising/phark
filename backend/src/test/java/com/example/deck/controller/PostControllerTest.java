@@ -86,4 +86,20 @@ class PostControllerTest {
                         .content(body))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void createPostWithLongAuthorReturnsBadRequest() throws Exception {
+        String body = """
+                {
+                  "author": "%s",
+                  "content": "Author is too long",
+                  "channel": "home"
+                }
+                """.formatted("A".repeat(81));
+
+        mockMvc.perform(post("/api/posts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
 }

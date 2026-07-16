@@ -9,7 +9,7 @@
 ```text
 本機 / Agent Coding CLI
         │
-        │ git push main
+        │ git push master
         ▼
 GitHub Actions
   ├─ Docker build + 測試

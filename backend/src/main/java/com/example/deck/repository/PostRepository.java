@@ -28,14 +28,14 @@ public class PostRepository {
 
     public List<Post> findAll() {
         return jdbcClient
-                .sql("SELECT id, author, content, channel, created_at FROM posts ORDER BY created_at DESC")
+                .sql("SELECT id, author, content, channel, created_at FROM posts ORDER BY created_at DESC, id DESC")
                 .query(this::mapPost)
                 .list();
     }
 
     public List<Post> findByChannel(String channel) {
         return jdbcClient
-                .sql("SELECT id, author, content, channel, created_at FROM posts WHERE channel = ? ORDER BY created_at DESC")
+                .sql("SELECT id, author, content, channel, created_at FROM posts WHERE channel = ? ORDER BY created_at DESC, id DESC")
                 .param(channel)
                 .query(this::mapPost)
                 .list();

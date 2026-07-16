@@ -337,13 +337,13 @@ mkdir -p .github/workflows
 cp deploy/templates/github/workflows/ci-cd.yml .github/workflows/ci-cd.yml
 git add .github/workflows/ci-cd.yml
 git commit -m "Add CI/CD workflow"
-git push origin main
+git push origin master
 ```
 
 設計要點：
 
 - PR 只 build，不 push、不 deploy
-- push 到 `main` 才發布映像到 GHCR
+- push 到 `master` 才發布映像到 GHCR
 - 同時打 `sha-<commit>` 與 `latest` tag
 - production 永遠部署 `sha-<commit>`，不用 `latest`
 - deploy concurrency = 1
@@ -374,7 +374,7 @@ dig +short deck.example.com
 ## 步驟 13：第一次 push 與驗收
 
 ```bash
-git push origin main
+git push origin master
 ```
 
 GitHub Actions 應顯示 `Build container image` 與 `Deploy production` 成功。
@@ -487,7 +487,7 @@ docker image ls ghcr.io/fallrising/phark
 [ ] edge-traefik 顯示 healthy
 [ ] 本機 docker build 成功
 [ ] 本機 /actuator/health 返回 UP
-[ ] push main 後 GHCR 出現 sha-<commit> image
+[ ] push master 後 GHCR 出現 sha-<commit> image
 [ ] GitHub deploy job 成功
 [ ] VPS deck-app 顯示 healthy
 [ ] https://deck.example.com 可訪問
