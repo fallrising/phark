@@ -97,7 +97,7 @@ phark/
 
 | 變數 | 預設 | 說明 |
 |------|------|------|
-| `APP_DB_PATH` | `/data/deck.db` | SQLite 檔案路徑 |
+| `APP_DB_PATH` | 本地為 `./data/deck.db`；prod 為 `/data/deck.db` | SQLite 檔案路徑 |
 | `SPRING_PROFILES_ACTIVE` | — | 設為 `prod` 啟用 production 設定 |
 | `SERVER_PORT` | `8080` | HTTP 埠（prod profile） |
 
@@ -124,17 +124,28 @@ phark/
 - Java 17 + Maven 3.9+
 - Node.js 24 + npm
 
-### 僅前端
+### 本地前後端
+
+先啟動 backend：
+
+```bash
+mvn -f backend/pom.xml spring-boot:run
+```
+
+開發環境預設將 SQLite 寫入 `./data/deck.db`。如需其他位置，可設定
+`APP_DB_PATH`。
+
+再於另一個 terminal 啟動 frontend：
 
 ```bash
 cd frontend
 npm ci
-npm run dev        # http://localhost:5173（需 proxy 或 mock API）
+npm run dev        # http://localhost:5173
 npm run lint
 npm run build
 ```
 
-前端 development 時無後端同源，需自行處理 API proxy 或連已啟動的 backend。
+開發伺服器會將 `/api/*` proxy 到 `http://localhost:8080`。
 
 ### 僅後端（含測試）
 

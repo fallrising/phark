@@ -16,4 +16,6 @@ npm run lint     # oxlint
 npm run build    # TypeScript + Vite production build
 ```
 
+`npm run dev` 會將 `/api/*` proxy 到本地的 backend `http://localhost:8080`。
+
 Production build 由 Dockerfile 執行，產物嵌入 Spring Boot `static/` 目錄，與後端同源。

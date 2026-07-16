@@ -18,7 +18,7 @@ public class DatabaseConfig {
 
     @Bean
     @Primary
-    public DataSource dataSource(@Value("${app.db.path:/data/deck.db}") String dbPath) throws Exception {
+    public DataSource dataSource(@Value("${app.db.path:./data/deck.db}") String dbPath) throws Exception {
         if (!":memory:".equals(dbPath)) {
             Path path = Path.of(dbPath);
             Path parent = path.getParent();
