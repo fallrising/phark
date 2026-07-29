@@ -65,4 +65,5 @@ curl -fsS -X POST http://localhost:8080/api/posts \
 ## 里程碑
 
 - [x] 應用程式與 Docker build
+- [x] 三欄時間線 cursor pagination
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）

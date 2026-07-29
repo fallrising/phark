@@ -47,6 +47,7 @@ phark/
 | 三欄版面 | Home、Tech、Ops（桌面並排，手機橫向捲動） |
 | Post cards | 每欄顯示文章卡片 |
 | Composer | 上方輸入 author、content、channel |
+| 游標分頁 | 每欄先載入 20 筆，可獨立載入更舊文章 |
 | 自動刷新 | 發文後三欄自動重新載入 |
 
 ## REST API

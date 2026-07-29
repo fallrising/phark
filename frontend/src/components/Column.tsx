@@ -1,4 +1,5 @@
 import { PostCard } from "@/components/PostCard"
+import { Button } from "@/components/ui/button"
 import type { Channel, Post } from "@/types/post"
 
 const CHANNEL_LABELS: Record<Channel, string> = {
@@ -10,16 +11,27 @@ const CHANNEL_LABELS: Record<Channel, string> = {
 interface ColumnProps {
   channel: Channel
   posts: Post[]
+  hasMore: boolean
+  loadingMore: boolean
+  error: string | null
+  onLoadMore: () => void
 }
 
-export function Column({ channel, posts }: ColumnProps) {
+export function Column({
+  channel,
+  posts,
+  hasMore,
+  loadingMore,
+  error,
+  onLoadMore,
+}: ColumnProps) {
   return (
     <section className="flex h-full min-w-[280px] flex-1 flex-col rounded-2xl border border-border/70 bg-muted/30 md:min-w-0">
       <header className="sticky top-0 z-10 border-b border-border/60 bg-muted/60 px-4 py-3 backdrop-blur">
         <h2 className="text-sm font-semibold tracking-wide text-foreground">
           {CHANNEL_LABELS[channel]}
         </h2>
-        <p className="text-xs text-muted-foreground">{posts.length} posts</p>
+        <p className="text-xs text-muted-foreground">{posts.length} loaded</p>
       </header>
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         {posts.length === 0 ? (
@@ -27,6 +39,22 @@ export function Column({ channel, posts }: ColumnProps) {
         ) : (
           posts.map((post) => <PostCard key={post.id} post={post} />)
         )}
+        {error ? (
+          <p role="alert" className="text-xs text-destructive">
+            {error}
+          </p>
+        ) : null}
+        {hasMore ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loadingMore}
+            onClick={onLoadMore}
+          >
+            {loadingMore ? "Loading..." : "Load more"}
+          </Button>
+        ) : null}
       </div>
     </section>
   )

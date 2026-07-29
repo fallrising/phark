@@ -18,11 +18,11 @@
 
 ## 階段 C：Frontend vertical slice
 
-- [ ] 更新 TypeScript page contract 與 API client。
-- [ ] 每欄保存獨立 cursor、loading 與 error state。
-- [ ] Column 新增「Load more」互動。
-- [ ] 發文成功後重設三欄第一頁。
-- [ ] 更新使用者文件。
+- [x] 更新 TypeScript page contract 與 API client。
+- [x] 每欄保存獨立 cursor、loading 與 error state。
+- [x] Column 新增「Load more」互動。
+- [x] 發文成功後重設三欄第一頁。
+- [x] 更新使用者文件。
 
 ## 階段 D：整合驗證
 
