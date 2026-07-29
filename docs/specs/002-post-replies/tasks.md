@@ -19,12 +19,12 @@
 
 ## 階段 C：Frontend vertical slice
 
-- [ ] 更新 Post、Reply、ReplyPage TypeScript contract。
-- [ ] 新增 replies API client。
-- [ ] 新增 ReplyThread 與 reply composer。
-- [ ] PostCard 顯示 count 並獨立展開 conversation。
-- [ ] 發表後 append reply 並更新 timeline count。
-- [ ] 更新使用者文件。
+- [x] 更新 Post、Reply、ReplyPage TypeScript contract。
+- [x] 新增 replies API client。
+- [x] 新增 ReplyThread 與 reply composer。
+- [x] PostCard 顯示 count 並獨立展開 conversation。
+- [x] 發表後 append reply 並更新 timeline count。
+- [x] 更新使用者文件。
 
 ## 階段 D：整合驗證
 

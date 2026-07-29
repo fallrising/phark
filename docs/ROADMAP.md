@@ -13,7 +13,7 @@
 - [~] **SDD-002 — Replies and conversation threads**
   - [x] 規格、設計與 API 契約
   - [x] replies table、repository、service、tests
-  - [ ] inline conversation UI 與 reply composer
+  - [x] inline conversation UI 與 reply composer
   - [ ] Docker、runtime 與 CI 驗收
 - [ ] **SDD-003 — Schema migrations**
   - [ ] 導入 Flyway
