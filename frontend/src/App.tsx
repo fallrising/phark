@@ -121,6 +121,25 @@ export default function App() {
     [feeds]
   )
 
+  const handleReplyCreated = useCallback((postId: number) => {
+    setFeeds((current) => {
+      const updateFeed = (feed: ChannelFeed): ChannelFeed => ({
+        ...feed,
+        items: feed.items.map((post) =>
+          post.id === postId
+            ? { ...post, replyCount: post.replyCount + 1 }
+            : post
+        ),
+      })
+
+      return {
+        home: updateFeed(current.home),
+        tech: updateFeed(current.tech),
+        ops: updateFeed(current.ops),
+      }
+    })
+  }, [])
+
   useEffect(() => {
     void loadPosts()
   }, [loadPosts])
@@ -147,6 +166,7 @@ export default function App() {
                   loadingMore={feed.loadingMore}
                   error={feed.error}
                   onLoadMore={() => void loadMore(channel)}
+                  onReplyCreated={handleReplyCreated}
                 />
               )
             })}

@@ -35,9 +35,12 @@ curl -fsS http://localhost:8080/actuator/health
 | GET | `/api/posts` | 最新一頁文章（預設 20 筆） |
 | GET | `/api/posts?channel=home&limit=20&before=...` | 依 channel 與 cursor 分頁 |
 | POST | `/api/posts` | 建立文章 |
+| GET | `/api/posts/{postId}/replies?limit=20&after=...` | 正序讀取回覆 |
+| POST | `/api/posts/{postId}/replies` | 建立單層回覆 |
 
 `GET /api/posts` 回傳 `{ "items": [...], "nextCursor": "..." }`。將非空的
 `nextCursor` 作為下一次 request 的 `before`；`limit` 允許 `1..100`。
+回覆 page 使用相同 response envelope，將 `nextCursor` 作為 `after`。
 
 ```bash
 curl -fsS -X POST http://localhost:8080/api/posts \
@@ -66,4 +69,5 @@ curl -fsS -X POST http://localhost:8080/api/posts \
 
 - [x] 應用程式與 Docker build
 - [x] 三欄時間線 cursor pagination
+- [x] 單層回覆與 inline conversation threads
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）

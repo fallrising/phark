@@ -7,7 +7,9 @@
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 部署藍圖、技術決策、與 Kubernetes 對照、SQLite 界線 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 專案結構、本地開發、API 規格、環境變數、測試 |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | VPS 從零到上線的完整步驟（Docker、Traefik、GHCR、CI/CD） |
+| [ROADMAP.md](./ROADMAP.md) | 依優先級與依賴整理的產品任務樹 |
 | [specs/001-timeline-pagination/](./specs/001-timeline-pagination/) | 時間線游標分頁的規格、設計與任務 |
+| [specs/002-post-replies/](./specs/002-post-replies/) | 回覆與對話串的規格、設計與任務 |
 
 ## 部署模板
 

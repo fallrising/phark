@@ -15,6 +15,7 @@ interface ColumnProps {
   loadingMore: boolean
   error: string | null
   onLoadMore: () => void
+  onReplyCreated: (postId: number) => void
 }
 
 export function Column({
@@ -24,6 +25,7 @@ export function Column({
   loadingMore,
   error,
   onLoadMore,
+  onReplyCreated,
 }: ColumnProps) {
   return (
     <section className="flex h-full min-w-[280px] flex-1 flex-col rounded-2xl border border-border/70 bg-muted/30 md:min-w-0">
@@ -37,7 +39,13 @@ export function Column({
         {posts.length === 0 ? (
           <p className="text-sm text-muted-foreground">No posts yet.</p>
         ) : (
-          posts.map((post) => <PostCard key={post.id} post={post} />)
+          posts.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              onReplyCreated={onReplyCreated}
+            />
+          ))
         )}
         {error ? (
           <p role="alert" className="text-xs text-destructive">

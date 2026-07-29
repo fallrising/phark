@@ -13,11 +13,11 @@ phark/
 │       │   ├── java/com/example/deck/
 │       │   │   ├── DeckApplication.java
 │       │   │   ├── config/       # DatabaseConfig, WebConfig (SPA fallback)
-│       │   │   ├── controller/   # PostController
-│       │   │   ├── dto/          # CreatePostRequest
-│       │   │   ├── model/        # Post
-│       │   │   ├── repository/   # PostRepository (JdbcClient)
-│       │   │   └── service/      # PostService (含 seed data)
+│       │   │   ├── controller/   # PostController, ReplyController
+│       │   │   ├── dto/          # CreatePostRequest, CreateReplyRequest
+│       │   │   ├── model/        # Post, Reply 與 page contracts
+│       │   │   ├── repository/   # PostRepository, ReplyRepository (JdbcClient)
+│       │   │   └── service/      # PostService, ReplyService
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       ├── application-prod.properties
@@ -48,6 +48,7 @@ phark/
 | Post cards | 每欄顯示文章卡片 |
 | Composer | 上方輸入 author、content、channel |
 | 游標分頁 | 每欄先載入 20 筆，可獨立載入更舊文章 |
+| 對話串 | 每篇文章可正序讀取及建立單層回覆 |
 | 自動刷新 | 發文後三欄自動重新載入 |
 
 ## REST API
@@ -75,7 +76,8 @@ GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
       "author": "Alice",
       "content": "Hello",
       "channel": "home",
-      "createdAt": "2026-07-13T10:00:00Z"
+      "createdAt": "2026-07-13T10:00:00Z",
+      "replyCount": 2
     }
   ],
   "nextCursor": null
@@ -111,9 +113,36 @@ channel、limit 或 cursor 回傳 `400 Bad Request`。
   "author": "Alice",
   "content": "Hello",
   "channel": "home",
-  "createdAt": "2026-07-13T10:00:00Z"
+  "createdAt": "2026-07-13T10:00:00Z",
+  "replyCount": 0
 }
 ```
+
+### `GET /api/posts/{postId}/replies`
+
+回覆依 `created_at ASC, id ASC` 正序排列，使用 `after` cursor 讀取下一頁：
+
+```http
+GET /api/posts/1/replies?limit=20&after=<opaque-cursor>
+```
+
+回傳 `{ "items": [...], "nextCursor": "..." }`，其中每個 item 包含 `id`、
+`postId`、`author`、`content`、`createdAt`。`limit` 允許 `1..100`；不存在的
+parent post 回傳 `404`，無效 post id、limit 或 cursor 回傳 `400`。
+
+### `POST /api/posts/{postId}/replies`
+
+建立單層回覆，成功回傳 `201 Created` 與 Reply：
+
+```json
+{
+  "author": "Bob",
+  "content": "Agreed."
+}
+```
+
+author 與 content 的 validation 規則和文章相同。`replyCount` 由後端計算，
+建立成功後再次讀取 timeline 即會增加。
 
 ### Seed Data
 
@@ -227,7 +256,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 | 範圍 | 命令 | 覆蓋 |
 |------|------|------|
-| Backend | `mvn -f backend/pom.xml test` | invalid channel → 400、blank content → 400、seed data、CRUD |
+| Backend | `mvn -f backend/pom.xml test` | posts/replies cursor、validation、404、CRUD、reply count |
 | Frontend lint | `npm run lint`（在 `frontend/`） | oxlint |
 | Frontend build | `npm run build`（在 `frontend/`） | TypeScript + Vite |
 | 整合 | `docker build -t stream-deck .` | 含 frontend lint/build + Maven test |
