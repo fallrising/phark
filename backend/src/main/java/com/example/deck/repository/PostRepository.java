@@ -23,6 +23,10 @@ public class PostRepository {
 
     private static final DateTimeFormatter SQLITE_DATETIME =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final String POST_SELECT = """
+            SELECT p.id, p.author, p.content, p.channel, p.created_at,
+                   (SELECT COUNT(*) FROM replies r WHERE r.post_id = p.id) AS reply_count
+            FROM posts p""";
 
     private final JdbcClient jdbcClient;
 
@@ -31,19 +35,18 @@ public class PostRepository {
     }
 
     public List<Post> findPage(String channel, int fetchLimit, PostCursor before) {
-        StringBuilder sql = new StringBuilder(
-                "SELECT id, author, content, channel, created_at FROM posts");
+        StringBuilder sql = new StringBuilder(POST_SELECT);
         List<String> predicates = new ArrayList<>();
         Map<String, Object> parameters = new HashMap<>();
 
         if (channel != null) {
-            predicates.add("channel = :channel");
+            predicates.add("p.channel = :channel");
             parameters.put("channel", channel);
         }
         if (before != null) {
             predicates.add("""
-                    (created_at < :beforeCreatedAt
-                        OR (created_at = :beforeCreatedAt AND id < :beforeId))""");
+                    (p.created_at < :beforeCreatedAt
+                        OR (p.created_at = :beforeCreatedAt AND p.id < :beforeId))""");
             parameters.put(
                     "beforeCreatedAt",
                     LocalDateTime.ofInstant(before.createdAt(), ZoneOffset.UTC)
@@ -54,7 +57,7 @@ public class PostRepository {
             sql.append(" WHERE ").append(String.join(" AND ", predicates));
         }
 
-        sql.append(" ORDER BY created_at DESC, id DESC LIMIT :fetchLimit");
+        sql.append(" ORDER BY p.created_at DESC, p.id DESC LIMIT :fetchLimit");
         parameters.put("fetchLimit", fetchLimit);
 
         return jdbcClient
@@ -91,10 +94,19 @@ public class PostRepository {
 
     public Optional<Post> findById(long id) {
         return jdbcClient
-                .sql("SELECT id, author, content, channel, created_at FROM posts WHERE id = ?")
-                .param(id)
+                .sql(POST_SELECT + " WHERE p.id = :id")
+                .param("id", id)
                 .query(this::mapPost)
                 .optional();
+    }
+
+    public boolean existsById(long id) {
+        Long count = jdbcClient
+                .sql("SELECT COUNT(*) FROM posts WHERE id = :id")
+                .param("id", id)
+                .query(Long.class)
+                .single();
+        return count > 0;
     }
 
     public void insertSeed(String author, String content, String channel) {
@@ -114,6 +126,7 @@ public class PostRepository {
                 rs.getString("author"),
                 rs.getString("content"),
                 rs.getString("channel"),
-                instant);
+                instant,
+                rs.getLong("reply_count"));
     }
 }

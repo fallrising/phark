@@ -9,13 +9,13 @@
 
 ## 階段 B：Backend vertical slice
 
-- [ ] 新增 replies schema 與 composite index。
-- [ ] 新增 Reply model、request、page、repository。
-- [ ] 新增 parent validation 與 ReplyService。
-- [ ] 新增 nested replies controller routes。
-- [ ] Timeline Post 增加 server-computed `replyCount`。
-- [ ] 增加正常、分頁、404 與 validation tests。
-- [ ] 更新 API 文件。
+- [x] 新增 replies schema 與 composite index。
+- [x] 新增 Reply model、request、page、repository。
+- [x] 新增 parent validation 與 ReplyService。
+- [x] 新增 nested replies controller routes。
+- [x] Timeline Post 增加 server-computed `replyCount`。
+- [x] 增加正常、分頁、404 與 validation tests。
+- [x] 更新 API 文件。
 
 ## 階段 C：Frontend vertical slice
 

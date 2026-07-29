@@ -49,6 +49,7 @@ class PostControllerTest {
         mockMvc.perform(get("/api/posts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items", hasSize(greaterThanOrEqualTo(9))))
+                .andExpect(jsonPath("$.items[0].replyCount").isNumber())
                 .andExpect(jsonPath("$.nextCursor").value(nullValue()));
     }
 
@@ -162,7 +163,8 @@ class PostControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.author").value("Tester"))
                 .andExpect(jsonPath("$.content").value("Hello from tests"))
-                .andExpect(jsonPath("$.channel").value("home"));
+                .andExpect(jsonPath("$.channel").value("home"))
+                .andExpect(jsonPath("$.replyCount").value(0));
     }
 
     @Test
