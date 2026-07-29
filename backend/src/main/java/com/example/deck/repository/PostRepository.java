@@ -1,13 +1,17 @@
 package com.example.deck.repository;
 
 import com.example.deck.model.Post;
+import com.example.deck.model.PostCursor;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -26,17 +30,36 @@ public class PostRepository {
         this.jdbcClient = jdbcClient;
     }
 
-    public List<Post> findAll() {
-        return jdbcClient
-                .sql("SELECT id, author, content, channel, created_at FROM posts ORDER BY created_at DESC, id DESC")
-                .query(this::mapPost)
-                .list();
-    }
+    public List<Post> findPage(String channel, int fetchLimit, PostCursor before) {
+        StringBuilder sql = new StringBuilder(
+                "SELECT id, author, content, channel, created_at FROM posts");
+        List<String> predicates = new ArrayList<>();
+        Map<String, Object> parameters = new HashMap<>();
 
-    public List<Post> findByChannel(String channel) {
+        if (channel != null) {
+            predicates.add("channel = :channel");
+            parameters.put("channel", channel);
+        }
+        if (before != null) {
+            predicates.add("""
+                    (created_at < :beforeCreatedAt
+                        OR (created_at = :beforeCreatedAt AND id < :beforeId))""");
+            parameters.put(
+                    "beforeCreatedAt",
+                    LocalDateTime.ofInstant(before.createdAt(), ZoneOffset.UTC)
+                            .format(SQLITE_DATETIME));
+            parameters.put("beforeId", before.id());
+        }
+        if (!predicates.isEmpty()) {
+            sql.append(" WHERE ").append(String.join(" AND ", predicates));
+        }
+
+        sql.append(" ORDER BY created_at DESC, id DESC LIMIT :fetchLimit");
+        parameters.put("fetchLimit", fetchLimit);
+
         return jdbcClient
-                .sql("SELECT id, author, content, channel, created_at FROM posts WHERE channel = ? ORDER BY created_at DESC, id DESC")
-                .param(channel)
+                .sql(sql.toString())
+                .params(parameters)
                 .query(this::mapPost)
                 .list();
     }

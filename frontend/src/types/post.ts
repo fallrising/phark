@@ -13,3 +13,8 @@ export interface CreatePostRequest {
   content: string
   channel: Channel
 }
+
+export interface PostPage {
+  items: Post[]
+  nextCursor: string | null
+}

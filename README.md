@@ -32,9 +32,12 @@ curl -fsS http://localhost:8080/actuator/health
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
-| GET | `/api/posts` | 所有文章 |
-| GET | `/api/posts?channel=home` | 依 channel 過濾 |
+| GET | `/api/posts` | 最新一頁文章（預設 20 筆） |
+| GET | `/api/posts?channel=home&limit=20&before=...` | 依 channel 與 cursor 分頁 |
 | POST | `/api/posts` | 建立文章 |
+
+`GET /api/posts` 回傳 `{ "items": [...], "nextCursor": "..." }`。將非空的
+`nextCursor` 作為下一次 request 的 `before`；`limit` 允許 `1..100`。
 
 ```bash
 curl -fsS -X POST http://localhost:8080/api/posts \
@@ -62,4 +65,5 @@ curl -fsS -X POST http://localhost:8080/api/posts \
 ## 里程碑
 
 - [x] 應用程式與 Docker build
+- [x] 三欄時間線 cursor pagination
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）
