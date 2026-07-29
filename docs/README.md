@@ -10,6 +10,7 @@
 | [ROADMAP.md](./ROADMAP.md) | 依優先級與依賴整理的產品任務樹 |
 | [specs/001-timeline-pagination/](./specs/001-timeline-pagination/) | 時間線游標分頁的規格、設計與任務 |
 | [specs/002-post-replies/](./specs/002-post-replies/) | 回覆與對話串的規格、設計與任務 |
+| [specs/003-schema-migrations/](./specs/003-schema-migrations/) | SQLite 版本化 migration、legacy baseline 與復原規格 |
 
 ## 部署模板
 

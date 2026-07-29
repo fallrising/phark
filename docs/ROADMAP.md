@@ -15,7 +15,8 @@
   - [x] replies table、repository、service、tests
   - [x] inline conversation UI 與 reply composer
   - [x] Docker、runtime 與 CI 驗收
-- [ ] **SDD-003 — Schema migrations**
+- [~] **SDD-003 — Schema migrations**
+  - [x] migration history、legacy baseline 與 fail-closed 規格
   - [ ] 導入 Flyway
   - [ ] 將現有 schema 建立為 baseline migration
   - [ ] migration rollback/restore runbook
