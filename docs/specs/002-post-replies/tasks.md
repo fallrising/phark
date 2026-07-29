@@ -28,8 +28,8 @@
 
 ## 階段 D：整合驗證
 
-- [ ] Backend tests 通過。
-- [ ] Frontend lint/build 通過。
-- [ ] Docker build 通過。
-- [ ] Production container runtime smoke 通過。
-- [ ] GitHub Actions 通過。
+- [x] Backend tests 通過。
+- [x] Frontend lint/build 通過。
+- [x] Docker build 通過。
+- [x] Production container runtime smoke 通過。
+- [x] GitHub Actions 通過。

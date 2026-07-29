@@ -10,11 +10,11 @@
   - [x] bounded keyset API
   - [x] 三欄獨立載入更多
   - [x] Docker、runtime 與 CI 驗收
-- [~] **SDD-002 — Replies and conversation threads**
+- [x] **SDD-002 — Replies and conversation threads**
   - [x] 規格、設計與 API 契約
   - [x] replies table、repository、service、tests
   - [x] inline conversation UI 與 reply composer
-  - [ ] Docker、runtime 與 CI 驗收
+  - [x] Docker、runtime 與 CI 驗收
 - [ ] **SDD-003 — Schema migrations**
   - [ ] 導入 Flyway
   - [ ] 將現有 schema 建立為 baseline migration

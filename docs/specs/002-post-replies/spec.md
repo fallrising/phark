@@ -1,6 +1,6 @@
 # 002：回覆與對話串
 
-> 狀態：Approved for implementation
+> 狀態：Implemented
 > 日期：2026-07-29
 
 ## 問題
@@ -114,12 +114,12 @@ Content-Type: application/json
 
 ## 驗收條件
 
-- [ ] Timeline page 的每篇文章都包含 `replyCount`。
-- [ ] 無回覆的既有文章 `replyCount` 為 0。
-- [ ] `limit=2` 可依正序逐頁讀完回覆且無重複。
-- [ ] 相同 timestamp 的回覆可依 `id ASC` 穩定跨頁。
-- [ ] 建立回覆回傳 201，timeline count 隨後增加。
-- [ ] 不存在的 parent 在 GET/POST 都回傳 404。
-- [ ] 無效 postId、limit、cursor 與 body 均回傳 400。
-- [ ] 三欄內的對話串可獨立展開、載入與發表。
-- [ ] Backend tests、frontend lint/build、Docker build 與 runtime smoke 全部通過。
+- [x] Timeline page 的每篇文章都包含 `replyCount`。
+- [x] 無回覆的既有文章 `replyCount` 為 0。
+- [x] `limit=2` 可依正序逐頁讀完回覆且無重複。
+- [x] 相同 timestamp 的回覆可依 `id ASC` 穩定跨頁。
+- [x] 建立回覆回傳 201，timeline count 隨後增加。
+- [x] 不存在的 parent 在 GET/POST 都回傳 404。
+- [x] 無效 postId、limit、cursor 與 body 均回傳 400。
+- [x] 三欄內的對話串可獨立展開、載入與發表。
+- [x] Backend tests、frontend lint/build、Docker build 與 runtime smoke 全部通過。
