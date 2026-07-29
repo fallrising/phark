@@ -53,11 +53,36 @@ phark/
 
 ### `GET /api/posts`
 
-回傳所有文章（依 `created_at` 降序）。
+回傳最新一頁文章。排序固定為 `created_at DESC, id DESC`，使用 keyset cursor，
+不使用 `OFFSET`。
 
-### `GET /api/posts?channel=home`
+```http
+GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
+```
 
-依 channel 過濾。允許值：`home`、`tech`、`ops`。
+| 參數 | 預設 | 規則 |
+|------|------|------|
+| `channel` | 全部 | `home`、`tech`、`ops` |
+| `limit` | `20` | `1..100` |
+| `before` | — | 上一頁的 `nextCursor`；client 不解析 |
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "author": "Alice",
+      "content": "Hello",
+      "channel": "home",
+      "createdAt": "2026-07-13T10:00:00Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+若仍有更舊資料，`nextCursor` 為 URL-safe Base64 字串；否則為 `null`。無效的
+channel、limit 或 cursor 回傳 `400 Bad Request`。
 
 ### `POST /api/posts`
 
@@ -77,7 +102,7 @@ phark/
 | `content` | 不可空白，最多 500 字 |
 | `channel` | 僅允許 `home`、`tech`、`ops`；無效回傳 `400` |
 
-### 回應範例
+### 建立文章回應範例
 
 ```json
 {

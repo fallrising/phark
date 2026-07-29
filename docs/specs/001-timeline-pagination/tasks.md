@@ -9,12 +9,12 @@
 
 ## 階段 B：Backend vertical slice
 
-- [ ] 新增 `PostPage`、內部 cursor model 與 codec。
-- [ ] 將 Repository 查詢改為 bounded keyset query。
-- [ ] 新增 composite indexes。
-- [ ] Controller 接受 `limit`、`before` 並回傳 page object。
-- [ ] 增加正常、邊界與錯誤測試。
-- [ ] 更新 API 文件。
+- [x] 新增 `PostPage`、內部 cursor model 與 codec。
+- [x] 將 Repository 查詢改為 bounded keyset query。
+- [x] 新增 composite indexes。
+- [x] Controller 接受 `limit`、`before` 並回傳 page object。
+- [x] 增加正常、邊界與錯誤測試。
+- [x] 更新 API 文件。
 
 ## 階段 C：Frontend vertical slice
 

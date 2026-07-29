@@ -6,5 +6,8 @@ CREATE TABLE IF NOT EXISTS posts (
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_posts_channel ON posts(channel);
-CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
+DROP INDEX IF EXISTS idx_posts_channel;
+DROP INDEX IF EXISTS idx_posts_created_at;
+
+CREATE INDEX IF NOT EXISTS idx_posts_timeline ON posts(created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_channel_timeline ON posts(channel, created_at DESC, id DESC);
