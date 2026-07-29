@@ -26,7 +26,19 @@
 
 ## 階段 D：整合驗證
 
-- [ ] Backend tests 通過。
-- [ ] Frontend lint/build 通過。
-- [ ] Docker build 通過。
-- [ ] 審查 migration、API contract 與空/錯誤狀態。
+- [x] Backend tests 通過。
+- [x] Frontend lint/build 通過。
+- [x] Docker build 通過。
+- [x] 審查 migration、API contract 與空/錯誤狀態。
+
+## 驗收記錄
+
+2026-07-29：
+
+- `docker build --progress=plain -t phark:timeline-frontend .` 成功。
+- Oxlint：0 errors（1 個既有 `button.tsx` fast-refresh warning）。
+- Vite/TypeScript production build 成功。
+- Backend：32 tests，0 failures，0 errors。
+- Production container health 為 `UP`，SPA 可讀取。
+- Runtime API 驗證第一頁、下一頁、無效 channel 400 與 POST 後最新頁。
+- GitHub Actions `Build container image` 通過。

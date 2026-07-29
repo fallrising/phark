@@ -1,6 +1,6 @@
 # 001：時間線游標分頁
 
-> 狀態：Approved for implementation
+> 狀態：Implemented
 > 日期：2026-07-29
 
 ## 問題
@@ -88,11 +88,11 @@ GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
 
 ## 驗收條件
 
-- [ ] 無參數查詢最多回傳 20 筆，response 符合 page schema。
-- [ ] `limit=2` 可逐頁讀完資料，頁與頁之間無重複。
-- [ ] channel 分頁不會混入其他 channel。
-- [ ] 兩筆相同 timestamp 的文章可依 `id DESC` 穩定跨頁。
-- [ ] 新文章在讀取下一頁前加入時，舊游標分頁結果不重複。
-- [ ] 無效 channel、limit、cursor 均回傳 400。
-- [ ] 三欄可獨立載入更多，發文後重設為最新頁。
-- [ ] Backend tests、frontend lint/build、Docker build 全部通過。
+- [x] 無參數查詢最多回傳 20 筆，response 符合 page schema。
+- [x] `limit=2` 可逐頁讀完資料，頁與頁之間無重複。
+- [x] channel 分頁不會混入其他 channel。
+- [x] 兩筆相同 timestamp 的文章可依 `id DESC` 穩定跨頁。
+- [x] 新文章在讀取下一頁前加入時，舊游標分頁結果不重複。
+- [x] 無效 channel、limit、cursor 均回傳 400。
+- [x] 三欄可獨立載入更多，發文後重設為最新頁。
+- [x] Backend tests、frontend lint/build、Docker build 全部通過。
