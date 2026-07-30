@@ -37,4 +37,4 @@
 - [x] Docker build 通過。
 - [x] Production container 空 volume smoke 通過。
 - [x] Production container legacy volume upgrade smoke 通過。
-- [ ] GitHub Actions 通過。
+- [x] GitHub Actions 通過。
