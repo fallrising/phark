@@ -21,8 +21,8 @@
   - [x] 將現有 schema 建立為 baseline migration
   - [x] migration rollback/restore runbook
 - [~] **SDD-004 — Consistent API errors**
-  - [~] RFC 9457 Problem Details
-  - [ ] validation field errors
+  - [x] RFC 9457 Problem Details
+  - [x] validation field errors
   - [ ] request correlation ID
 
 ## P1：社交核心

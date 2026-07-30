@@ -1,15 +1,15 @@
 package com.example.deck.service;
 
 import com.example.deck.dto.CreateReplyRequest;
+import com.example.deck.error.ApiErrorCode;
+import com.example.deck.error.ApiException;
 import com.example.deck.model.PostCursor;
 import com.example.deck.model.Reply;
 import com.example.deck.model.ReplyPage;
 import com.example.deck.repository.PostRepository;
 import com.example.deck.repository.ReplyRepository;
 import java.util.List;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ReplyService {
@@ -36,8 +36,7 @@ public class ReplyService {
             try {
                 afterCursor = cursorCodec.decode(after);
             } catch (IllegalArgumentException exception) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Invalid cursor", exception);
+                throw new ApiException(ApiErrorCode.INVALID_CURSOR, exception);
             }
         }
 
@@ -60,18 +59,16 @@ public class ReplyService {
 
     private void validatePost(long postId) {
         if (postId <= 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Post id must be positive");
+            throw new ApiException(ApiErrorCode.INVALID_POST_ID);
         }
         if (!postRepository.existsById(postId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found");
+            throw new ApiException(ApiErrorCode.POST_NOT_FOUND);
         }
     }
 
     private void validateLimit(int limit) {
         if (limit < 1 || limit > 100) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, "Limit must be between 1 and 100");
+            throw new ApiException(ApiErrorCode.INVALID_LIMIT);
         }
     }
 

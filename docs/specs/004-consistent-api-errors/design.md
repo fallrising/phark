@@ -48,8 +48,9 @@ Contract 不從 exception message 或 HTTP reason phrase 反向推導。已知�
 
 ### `ApiException`
 
-只攜帶已批准對外顯示的 detail 與 optional violations。原始 cause 可供 server log
-使用，但不序列化。這會取代 `PostService`、`ReplyService` 中現有的
+只攜帶 error code、由 code 定義的安全 detail 與 optional cause。原始 cause 可供
+server log 使用，但不序列化；validation violations 則由 MVC handler 從 binding
+result 建立。這會取代 `PostService`、`ReplyService` 中現有的
 `ResponseStatusException`。
 
 ### `ApiExceptionHandler`

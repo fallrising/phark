@@ -1,6 +1,8 @@
 package com.example.deck.service;
 
 import com.example.deck.dto.CreatePostRequest;
+import com.example.deck.error.ApiErrorCode;
+import com.example.deck.error.ApiException;
 import com.example.deck.model.Post;
 import com.example.deck.model.PostCursor;
 import com.example.deck.model.PostPage;
@@ -8,9 +10,7 @@ import com.example.deck.repository.PostRepository;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.Set;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class PostService {
@@ -34,7 +34,7 @@ public class PostService {
             try {
                 beforeCursor = cursorCodec.decode(before);
             } catch (IllegalArgumentException exception) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid cursor", exception);
+                throw new ApiException(ApiErrorCode.INVALID_CURSOR, exception);
             }
         }
 
@@ -75,13 +75,13 @@ public class PostService {
 
     private void validateChannel(String channel) {
         if (channel != null && !VALID_CHANNELS.contains(channel)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid channel");
+            throw new ApiException(ApiErrorCode.INVALID_CHANNEL);
         }
     }
 
     private void validateLimit(int limit) {
         if (limit < 1 || limit > 100) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Limit must be between 1 and 100");
+            throw new ApiException(ApiErrorCode.INVALID_LIMIT);
         }
     }
 

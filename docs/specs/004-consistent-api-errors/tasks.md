@@ -20,22 +20,22 @@
 
 ## B：Backend vertical slice
 
-- [ ] **B.1 RED — 錯誤契約 tests**
-  - [ ] B.1.1 新增 reusable Problem Details assertions。
-  - [ ] B.1.2 驗證 validation、domain 400 與 404。
-  - [ ] B.1.3 驗證 malformed/type/method/media/route failures。
-- [ ] **B.2 GREEN — Domain error model**
-  - [ ] B.2.1 新增 `ApiErrorCode`。
-  - [ ] B.2.2 新增 `ApiException` 與 validation violation model。
-  - [ ] B.2.3 以 typed exceptions 取代 service `ResponseStatusException`。
-- [ ] **B.3 GREEN — Global mapper**
-  - [ ] B.3.1 實作 `ResponseEntityExceptionHandler` narrow overrides。
-  - [ ] B.3.2 確保所有 response 使用 `application/problem+json`。
-  - [ ] B.3.3 記錄且遮蔽 unknown 500。
-- [ ] **B.4 REFACTOR — 回歸**
-  - [ ] B.4.1 排序 violations 並移除重複 mapping logic。
-  - [ ] B.4.2 執行 focused controller tests。
-  - [ ] B.4.3 執行完整 backend tests。
+- [x] **B.1 RED — 錯誤契約 tests**
+  - [x] B.1.1 新增 reusable Problem Details assertions。
+  - [x] B.1.2 驗證 validation、domain 400 與 404。
+  - [x] B.1.3 驗證 malformed/type/method/media/route failures。
+- [x] **B.2 GREEN — Domain error model**
+  - [x] B.2.1 新增 `ApiErrorCode`。
+  - [x] B.2.2 新增 `ApiException` 與 validation violation model。
+  - [x] B.2.3 以 typed exceptions 取代 service `ResponseStatusException`。
+- [x] **B.3 GREEN — Global mapper**
+  - [x] B.3.1 實作 `ResponseEntityExceptionHandler` narrow overrides。
+  - [x] B.3.2 確保所有 response 使用 `application/problem+json`。
+  - [x] B.3.3 記錄且遮蔽 unknown 500。
+- [x] **B.4 REFACTOR — 回歸**
+  - [x] B.4.1 排序 violations 並移除重複 mapping logic。
+  - [x] B.4.2 執行 focused controller tests。
+  - [x] B.4.3 執行完整 backend tests。
 
 ## C：Request correlation
 

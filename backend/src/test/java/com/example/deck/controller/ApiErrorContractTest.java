@@ -1,0 +1,231 @@
+package com.example.deck.controller;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.example.deck.repository.PostRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultMatcher;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+@Import(ApiErrorContractTest.FailingController.class)
+class ApiErrorContractTest {
+
+    private static final String PROBLEM_JSON = "application/problem+json";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private PostRepository postRepository;
+
+    private long validPostId;
+
+    @BeforeEach
+    void setUp() {
+        validPostId = postRepository.findPage(null, 1, null).get(0).id();
+    }
+
+    @Test
+    void validationFailedReturnsProblemDetails() throws Exception {
+        String body = """
+                {"author": "", "content": "   ", "channel": "home"}
+                """;
+
+        mockMvc.perform(post("/api/posts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(problemDetails(
+                        400, "validation-failed", "Validation failed",
+                        "VALIDATION_FAILED", "/api/posts"))
+                .andExpect(jsonPath("$.detail")
+                        .value("One or more request fields are invalid."))
+                .andExpect(jsonPath("$.violations").isArray())
+                .andExpect(jsonPath("$.violations.length()").value(2))
+                .andExpect(jsonPath("$.violations[0].field").value("author"))
+                .andExpect(jsonPath("$.violations[0].message").value("author must not be blank"))
+                .andExpect(jsonPath("$.violations[1].field").value("content"))
+                .andExpect(jsonPath("$.violations[1].message").value("content must not be blank"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"news", ""})
+    void invalidChannelReturnsProblemDetails(String channel) throws Exception {
+        mockMvc.perform(get("/api/posts").param("channel", channel))
+                .andExpect(problemDetails(
+                        400, "invalid-channel", "Invalid channel",
+                        "INVALID_CHANNEL", "/api/posts"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "101"})
+    void invalidLimitOutOfRangeReturnsProblemDetails(String limit) throws Exception {
+        mockMvc.perform(get("/api/posts").param("limit", limit))
+                .andExpect(problemDetails(
+                        400, "invalid-limit", "Invalid limit",
+                        "INVALID_LIMIT", "/api/posts"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void invalidLimitNonNumericReturnsProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/posts").param("limit", "abc"))
+                .andExpect(problemDetails(
+                        400, "invalid-limit", "Invalid limit",
+                        "INVALID_LIMIT", "/api/posts"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void invalidCursorReturnsProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/posts").param("before", "invalid"))
+                .andExpect(problemDetails(
+                        400, "invalid-cursor", "Invalid cursor",
+                        "INVALID_CURSOR", "/api/posts"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void invalidReplyCursorReturnsProblemDetails() throws Exception {
+        String path = "/api/posts/" + validPostId + "/replies";
+        mockMvc.perform(get(path).param("after", "invalid"))
+                .andExpect(problemDetails(
+                        400, "invalid-cursor", "Invalid cursor",
+                        "INVALID_CURSOR", path))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1"})
+    void invalidPostIdNonPositiveReturnsProblemDetails(String postId) throws Exception {
+        String path = "/api/posts/" + postId + "/replies";
+        mockMvc.perform(get(path))
+                .andExpect(problemDetails(
+                        400, "invalid-post-id", "Invalid post ID",
+                        "INVALID_POST_ID", path))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void invalidPostIdNonNumericReturnsProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/posts/abc/replies"))
+                .andExpect(problemDetails(
+                        400, "invalid-post-id", "Invalid post ID",
+                        "INVALID_POST_ID", "/api/posts/abc/replies"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void postNotFoundReturnsProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/posts/999999999/replies"))
+                .andExpect(problemDetails(
+                        404, "post-not-found", "Post not found",
+                        "POST_NOT_FOUND", "/api/posts/999999999/replies"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void malformedJsonReturnsProblemDetails() throws Exception {
+        mockMvc.perform(post("/api/posts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{invalid"))
+                .andExpect(problemDetails(
+                        400, "malformed-request", "Malformed request",
+                        "MALFORMED_REQUEST", "/api/posts"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void unsupportedMediaTypeReturnsProblemDetails() throws Exception {
+        mockMvc.perform(post("/api/posts")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("not json"))
+                .andExpect(problemDetails(
+                        415, "unsupported-media-type", "Unsupported media type",
+                        "UNSUPPORTED_MEDIA_TYPE", "/api/posts"))
+                .andExpect(header().string(
+                        HttpHeaders.ACCEPT, containsString(MediaType.APPLICATION_JSON_VALUE)))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void methodNotAllowedReturnsProblemDetails() throws Exception {
+        mockMvc.perform(patch("/api/posts"))
+                .andExpect(problemDetails(
+                        405, "method-not-allowed", "Method not allowed",
+                        "METHOD_NOT_ALLOWED", "/api/posts"))
+                .andExpect(header().string(HttpHeaders.ALLOW, containsString("GET")))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void unexpectedExceptionReturnsRedactedProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/test/failure"))
+                .andExpect(problemDetails(
+                        500, "internal-error", "Internal server error",
+                        "INTERNAL_ERROR", "/api/test/failure"))
+                .andExpect(jsonPath("$.detail").value("An unexpected error occurred."))
+                .andExpect(content().string(not(containsString("database-password"))))
+                .andExpect(content().string(not(containsString("IllegalStateException"))));
+    }
+
+    @Test
+    void missingApiRouteReturnsProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/nonexistent"))
+                .andExpect(problemDetails(
+                        404, "resource-not-found", "Resource not found",
+                        "RESOURCE_NOT_FOUND", "/api/nonexistent"))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    private static ResultMatcher problemDetails(
+            int expectedStatus,
+            String typeSuffix,
+            String title,
+            String code,
+            String instance) {
+        return result -> {
+            status().is(expectedStatus).match(result);
+            content().contentType(PROBLEM_JSON).match(result);
+            jsonPath("$.type")
+                    .value("urn:phark:problem:" + typeSuffix)
+                    .match(result);
+            jsonPath("$.title").value(title).match(result);
+            jsonPath("$.status").value(expectedStatus).match(result);
+            jsonPath("$.instance").value(instance).match(result);
+            jsonPath("$.code").value(code).match(result);
+        };
+    }
+
+    @RestController
+    static class FailingController {
+
+        @GetMapping("/api/test/failure")
+        void fail() {
+            throw new IllegalStateException("database-password must stay server-side");
+        }
+    }
+}
