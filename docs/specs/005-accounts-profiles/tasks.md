@@ -50,18 +50,18 @@
 
 ## D：Authenticated authorship 與 profile API
 
-- [ ] **D.1 RED — Ownership contract**
-  - [ ] D.1.1 測試具有效 CSRF 的 anonymous post/reply create 回 401 且 row count 不變。
-  - [ ] D.1.2 測試 authenticated create 忽略 spoofed author 並保存 owner。
-  - [ ] D.1.3 測試 legacy content 保留 author 且 `authorHandle=null`。
-- [ ] **D.2 GREEN — Content ownership**
-  - [ ] D.2.1 Create DTO 移除 author，controller 使用 authenticated principal。
-  - [ ] D.2.2 Repository 寫 ownership/snapshot，read 使用 account LEFT JOIN。
-  - [ ] D.2.3 保持 timeline/replies cursor ordering、reply count 與 seed behavior。
-- [ ] **D.3 GREEN/REFACTOR — Profile API**
-  - [ ] D.3.1 實作 public profile read 與 404 contract。
-  - [ ] D.3.2 實作 current profile update 與 auth/validation contract。
-  - [ ] D.3.3 實作 author posts cursor page 並跑完整 backend suite。
+- [x] **D.1 RED — Ownership contract**
+  - [x] D.1.1 測試具有效 CSRF 的 anonymous post/reply create 回 401 且 row count 不變。
+  - [x] D.1.2 測試 authenticated create 忽略 spoofed author 並保存 owner。
+  - [x] D.1.3 測試 legacy content 保留 author 且 `authorHandle=null`。
+- [x] **D.2 GREEN — Content ownership**
+  - [x] D.2.1 Create DTO 移除 author，controller 使用 authenticated principal。
+  - [x] D.2.2 Repository 寫 ownership/snapshot，read 使用 account LEFT JOIN。
+  - [x] D.2.3 保持 timeline/replies cursor ordering、reply count 與 seed behavior。
+- [x] **D.3 GREEN/REFACTOR — Profile API**
+  - [x] D.3.1 實作 public profile read 與 404 contract。
+  - [x] D.3.2 實作 current profile update 與 auth/validation contract。
+  - [x] D.3.3 實作 author posts cursor page 並跑完整 backend suite。
 
 ## E：Frontend identity 與 profile experience
 

@@ -10,14 +10,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.deck.model.Account;
 import com.example.deck.model.Post;
 import com.example.deck.model.Reply;
+import com.example.deck.repository.AccountRepository;
 import com.example.deck.repository.PostRepository;
 import com.example.deck.repository.ReplyRepository;
+import com.example.deck.security.AccountPrincipal;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -48,7 +52,18 @@ class ReplyControllerTest {
     private ReplyRepository replyRepository;
 
     @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
     private JdbcClient jdbcClient;
+
+    private AccountPrincipal principal;
+
+    @BeforeEach
+    void setUpAccount() {
+        Account account = accountRepository.insert("replytester", "Tester", "unused-hash");
+        principal = new AccountPrincipal(account.id(), account.handle(), null);
+    }
 
     @Test
     void emptyConversationReturnsPageSchema() throws Exception {
@@ -65,19 +80,19 @@ class ReplyControllerTest {
         Post parent = createParent();
         String body = """
                 {
-                  "author": "  Alice  ",
                   "content": "  First reply  "
                 }
                 """;
 
         mockMvc.perform(post(repliesUrl(parent.id()))
-                        .with(user("test"))
+                        .with(user(principal))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.postId").value(parent.id()))
-                .andExpect(jsonPath("$.author").value("Alice"))
+                .andExpect(jsonPath("$.author").value("Tester"))
+                .andExpect(jsonPath("$.authorHandle").value("replytester"))
                 .andExpect(jsonPath("$.content").value("First reply"));
 
         assertThat(postRepository.findById(parent.id()).orElseThrow().replyCount()).isEqualTo(1);
@@ -116,7 +131,7 @@ class ReplyControllerTest {
         mockMvc.perform(get(repliesUrl(missingId)))
                 .andExpect(status().isNotFound());
         mockMvc.perform(post(repliesUrl(missingId))
-                        .with(user("test"))
+                        .with(user(principal))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody()))
@@ -129,7 +144,7 @@ class ReplyControllerTest {
         mockMvc.perform(get("/api/posts/" + postId + "/replies"))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post("/api/posts/" + postId + "/replies")
-                        .with(user("test"))
+                        .with(user(principal))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody()))
@@ -159,13 +174,12 @@ class ReplyControllerTest {
         Post parent = createParent();
         String body = """
                 {
-                  "author": "Tester",
                   "content": "   "
                 }
                 """;
 
         mockMvc.perform(post(repliesUrl(parent.id()))
-                        .with(user("test"))
+                        .with(user(principal))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -223,7 +237,6 @@ class ReplyControllerTest {
     private String validBody() {
         return """
                 {
-                  "author": "Tester",
                   "content": "Valid reply"
                 }
                 """;

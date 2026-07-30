@@ -27,6 +27,8 @@ public enum ApiErrorCode {
             "CSRF token invalid", "A valid CSRF token is required for this request."),
     ACCESS_DENIED("urn:phark:problem:access-denied", HttpStatus.FORBIDDEN,
             "Access denied", "This account is not authorized for the request."),
+    PROFILE_NOT_FOUND("urn:phark:problem:profile-not-found", HttpStatus.NOT_FOUND,
+            "Profile not found", "The requested profile does not exist."),
     POST_NOT_FOUND("urn:phark:problem:post-not-found", HttpStatus.NOT_FOUND,
             "Post not found", "The requested post does not exist."),
     RESOURCE_NOT_FOUND("urn:phark:problem:resource-not-found", HttpStatus.NOT_FOUND,

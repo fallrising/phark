@@ -64,6 +64,14 @@ public class AccountService {
         return accountRepository.findById(accountId).map(this::toProfile);
     }
 
+    public AccountProfile getProfileByHandle(String handle) {
+        return toProfile(requireAccountByHandle(handle));
+    }
+
+    public long getAccountIdByHandle(String handle) {
+        return requireAccountByHandle(handle).id();
+    }
+
     public String canonicalizeHandle(String handle) {
         if (handle == null) {
             throw validationFailed();
@@ -113,6 +121,17 @@ public class AccountService {
                 account.displayName(),
                 account.bio(),
                 account.createdAt());
+    }
+
+    private Account requireAccountByHandle(String handle) {
+        String canonicalHandle;
+        try {
+            canonicalHandle = canonicalizeHandle(handle);
+        } catch (ApiException exception) {
+            throw new ApiException(ApiErrorCode.PROFILE_NOT_FOUND, exception);
+        }
+        return accountRepository.findByHandle(canonicalHandle)
+                .orElseThrow(() -> new ApiException(ApiErrorCode.PROFILE_NOT_FOUND));
     }
 
     private ApiException validationFailed() {

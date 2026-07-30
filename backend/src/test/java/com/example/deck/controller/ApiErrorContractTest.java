@@ -68,7 +68,7 @@ class ApiErrorContractTest {
     @Test
     void validationFailedReturnsProblemDetails() throws Exception {
         String body = """
-                {"author": "", "content": "   ", "channel": "home"}
+                {"content": "   ", "channel": "home"}
                 """;
 
         mockMvc.perform(post("/api/posts")
@@ -82,11 +82,9 @@ class ApiErrorContractTest {
                 .andExpect(jsonPath("$.detail")
                         .value("One or more request fields are invalid."))
                 .andExpect(jsonPath("$.violations").isArray())
-                .andExpect(jsonPath("$.violations.length()").value(2))
-                .andExpect(jsonPath("$.violations[0].field").value("author"))
-                .andExpect(jsonPath("$.violations[0].message").value("author must not be blank"))
-                .andExpect(jsonPath("$.violations[1].field").value("content"))
-                .andExpect(jsonPath("$.violations[1].message").value("content must not be blank"));
+                .andExpect(jsonPath("$.violations.length()").value(1))
+                .andExpect(jsonPath("$.violations[0].field").value("content"))
+                .andExpect(jsonPath("$.violations[0].message").value("content must not be blank"));
     }
 
     @ParameterizedTest

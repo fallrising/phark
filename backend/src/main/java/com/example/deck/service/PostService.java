@@ -29,6 +29,20 @@ public class PostService {
         validateChannel(channel);
         validateLimit(limit);
 
+        PostCursor beforeCursor = decodeCursor(before);
+        return toPage(postRepository.findPage(channel, limit + 1, beforeCursor), limit);
+    }
+
+    public PostPage getPostsByAccountId(long accountId, int limit, String before) {
+        validateLimit(limit);
+
+        PostCursor beforeCursor = decodeCursor(before);
+        return toPage(
+                postRepository.findPageByAccountId(accountId, limit + 1, beforeCursor),
+                limit);
+    }
+
+    private PostCursor decodeCursor(String before) {
         PostCursor beforeCursor = null;
         if (before != null) {
             try {
@@ -37,8 +51,10 @@ public class PostService {
                 throw new ApiException(ApiErrorCode.INVALID_CURSOR, exception);
             }
         }
+        return beforeCursor;
+    }
 
-        List<Post> fetchedItems = postRepository.findPage(channel, limit + 1, beforeCursor);
+    private PostPage toPage(List<Post> fetchedItems, int limit) {
         boolean hasMore = fetchedItems.size() > limit;
         List<Post> items = hasMore
                 ? List.copyOf(fetchedItems.subList(0, limit))
@@ -50,8 +66,9 @@ public class PostService {
         return new PostPage(items, nextCursor);
     }
 
-    public Post createPost(CreatePostRequest request) {
-        return postRepository.insert(request.author().trim(), request.content().trim(), request.channel());
+    public Post createPost(long accountId, CreatePostRequest request) {
+        return postRepository.insertOwned(
+                accountId, request.content().trim(), request.channel());
     }
 
     @PostConstruct

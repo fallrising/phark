@@ -11,12 +11,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.deck.model.Account;
 import com.example.deck.model.Post;
+import com.example.deck.repository.AccountRepository;
 import com.example.deck.repository.PostRepository;
+import com.example.deck.security.AccountPrincipal;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashSet;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -44,7 +48,18 @@ class PostControllerTest {
     private PostRepository postRepository;
 
     @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
     private JdbcClient jdbcClient;
+
+    private AccountPrincipal principal;
+
+    @BeforeEach
+    void setUpAccount() {
+        Account account = accountRepository.insert("posttester", "Tester", "unused-hash");
+        principal = new AccountPrincipal(account.id(), account.handle(), null);
+    }
 
     @Test
     void getPostsReturnsPageSchema() throws Exception {
@@ -153,14 +168,13 @@ class PostControllerTest {
     void createPostReturnsCreatedPost() throws Exception {
         String body = """
                 {
-                  "author": "Tester",
                   "content": "Hello from tests",
                   "channel": "home"
                 }
                 """;
 
         mockMvc.perform(post("/api/posts")
-                        .with(user("test"))
+                        .with(user(principal))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -175,14 +189,13 @@ class PostControllerTest {
     void createPostWithInvalidChannelReturnsBadRequest() throws Exception {
         String body = """
                 {
-                  "author": "Tester",
                   "content": "Invalid channel",
                   "channel": "news"
                 }
                 """;
 
         mockMvc.perform(post("/api/posts")
-                        .with(user("test"))
+                        .with(user(principal))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -193,14 +206,13 @@ class PostControllerTest {
     void createPostWithBlankContentReturnsBadRequest() throws Exception {
         String body = """
                 {
-                  "author": "Tester",
                   "content": "   ",
                   "channel": "home"
                 }
                 """;
 
         mockMvc.perform(post("/api/posts")
-                        .with(user("test"))
+                        .with(user(principal))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -208,17 +220,16 @@ class PostControllerTest {
     }
 
     @Test
-    void createPostWithLongAuthorReturnsBadRequest() throws Exception {
+    void createPostWithLongContentReturnsBadRequest() throws Exception {
         String body = """
                 {
-                  "author": "%s",
-                  "content": "Author is too long",
+                  "content": "%s",
                   "channel": "home"
                 }
-                """.formatted("A".repeat(81));
+                """.formatted("A".repeat(501));
 
         mockMvc.perform(post("/api/posts")
-                        .with(user("test"))
+                        .with(user(principal))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
