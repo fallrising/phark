@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import { fetchPosts } from "@/api/posts"
+import { fetchPosts, getApiErrorMessage } from "@/api/posts"
 import { Column } from "@/components/Column"
 import { Composer } from "@/components/Composer"
 import type { Channel, Post } from "@/types/post"
@@ -54,9 +54,9 @@ export default function App() {
       if (requestVersion === refreshVersion.current) {
         setFeeds(Object.fromEntries(results) as Record<Channel, ChannelFeed>)
       }
-    } catch {
+    } catch (error) {
       if (requestVersion === refreshVersion.current) {
-        setError("Failed to load posts.")
+        setError(getApiErrorMessage(error, "Failed to load posts."))
       }
     } finally {
       if (requestVersion === refreshVersion.current) {
@@ -103,14 +103,14 @@ export default function App() {
             },
           }
         })
-      } catch {
+      } catch (error) {
         if (requestVersion === refreshVersion.current) {
           setFeeds((current) => ({
             ...current,
             [channel]: {
               ...current[channel],
               loadingMore: false,
-              error: "Failed to load more posts.",
+              error: getApiErrorMessage(error, "Failed to load more posts."),
             },
           }))
         }

@@ -42,6 +42,11 @@ curl -fsS http://localhost:8080/actuator/health
 `nextCursor` 作為下一次 request 的 `before`；`limit` 允許 `1..100`。
 回覆 page 使用相同 response envelope，將 `nextCursor` 作為 `after`。
 
+每個 response 都包含 `X-Request-ID`。API 錯誤使用
+`application/problem+json`（RFC 9457），以穩定的 `code` 供程式判斷，並在 body
+保留相同的 `requestId` 供除錯。完整 schema 與代碼見
+[開發指南的 API 錯誤契約](docs/DEVELOPMENT.md#api-錯誤契約)。
+
 ```bash
 curl -fsS -X POST http://localhost:8080/api/posts \
   -H 'Content-Type: application/json' \

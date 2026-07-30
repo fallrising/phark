@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from "react"
 import { ChevronDown, ChevronUp, MessageCircle, Send } from "lucide-react"
 
-import { createReply, fetchReplies } from "@/api/posts"
+import { createReply, fetchReplies, getApiErrorMessage } from "@/api/posts"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -67,8 +67,8 @@ export function ReplyThread({
       setItems((current) => mergeReplies(current, page.items))
       setNextCursor(page.nextCursor)
       setLoaded(true)
-    } catch {
-      setError("Unable to load replies. Please try again.")
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Unable to load replies. Please try again."))
     } finally {
       loadingPage.current = false
       setLoading(false)
@@ -108,8 +108,8 @@ export function ReplyThread({
       setItems((current) => mergeReplies(current, [reply]))
       setContent("")
       onReplyCreated(postId)
-    } catch {
-      setError("Unable to publish reply. Please try again.")
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Unable to publish reply. Please try again."))
     } finally {
       submittingReply.current = false
       setSubmitting(false)
