@@ -12,7 +12,7 @@ phark/
 │       ├── main/
 │       │   ├── java/com/example/deck/
 │       │   │   ├── DeckApplication.java
-│       │   │   ├── config/       # DatabaseConfig, WebConfig (SPA fallback)
+│       │   │   ├── config/       # DatabaseConfig, SchemaMigrationConfig, WebConfig
 │       │   │   ├── controller/   # PostController, ReplyController
 │       │   │   ├── dto/          # CreatePostRequest, CreateReplyRequest
 │       │   │   ├── model/        # Post, Reply 與 page contracts
@@ -21,7 +21,7 @@ phark/
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       ├── application-prod.properties
-│       │       └── schema.sql
+│       │       └── db/migration/  # Flyway V1、V2、V3...
 │       └── test/
 ├── frontend/                # React + TypeScript + Vite + shadcn/ui
 │   ├── package.json
@@ -161,7 +161,8 @@ author 與 content 的 validation 規則和文章相同。`replyCount` 由後端
 - JDBC URL：`jdbc:sqlite:<APP_DB_PATH>`
 - Hikari `maximum-pool-size=1`
 - 啟動 PRAGMA：`journal_mode=WAL`、`foreign_keys=ON`、`busy_timeout=5000`
-- Schema 由 `schema.sql` 建立
+- Schema 由 `db/migration/V*__*.sql` 依版本建立；legacy database 由 guard
+  辨識後 baseline。撰寫與 production 操作見 [MIGRATIONS.md](./MIGRATIONS.md)
 - **Database 不可打包進 Docker image**，必須透過 volume 掛載
 
 ### Spring Production 設定（`application-prod.properties`）
@@ -256,7 +257,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 | 範圍 | 命令 | 覆蓋 |
 |------|------|------|
-| Backend | `mvn -f backend/pom.xml test` | posts/replies cursor、validation、404、CRUD、reply count |
+| Backend | `mvn -f backend/pom.xml test` | posts/replies、migration upgrade、fail-closed、cursor、validation |
 | Frontend lint | `npm run lint`（在 `frontend/`） | oxlint |
 | Frontend build | `npm run build`（在 `frontend/`） | TypeScript + Vite |
 | 整合 | `docker build -t stream-deck .` | 含 frontend lint/build + Maven test |
@@ -273,6 +274,8 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 ## 給接手 LLM 的提示
 
 - 改 API 時同步更新 `PostControllerTest` 與 `frontend/src/api/posts.ts`
-- 新增 channel 需改：`CreatePostRequest`、`schema.sql` CHECK、`PostService` seed、`frontend` 的 `Channel` type 與 UI
+- 新增 channel 需改：`CreatePostRequest`、新增一個 forward-only migration 更新
+  CHECK constraint、`PostService` seed、`frontend` 的 `Channel` type 與 UI；不可修改
+  已發布的 migration
 - 部署相關設定在 `deploy/templates/` 與 `docs/DEPLOYMENT.md`，不在應用程式碼內
 - CI/CD workflow 模板在 `deploy/templates/github/workflows/ci-cd.yml`，加入 repo 前需設定 GitHub Secrets
