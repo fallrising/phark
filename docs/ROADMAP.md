@@ -1,6 +1,6 @@
 # Phark 產品任務樹
 
-> 最後更新：2026-07-29
+> 最後更新：2026-07-30
 
 狀態：`[x]` 完成、`[~]` 進行中、`[ ]` 待辦。優先級由 P0 到 P2。
 
@@ -20,8 +20,8 @@
   - [x] 導入 Flyway
   - [x] 將現有 schema 建立為 baseline migration
   - [x] migration rollback/restore runbook
-- [ ] **SDD-004 — Consistent API errors**
-  - [ ] RFC 9457 Problem Details
+- [~] **SDD-004 — Consistent API errors**
+  - [~] RFC 9457 Problem Details
   - [ ] validation field errors
   - [ ] request correlation ID
 
