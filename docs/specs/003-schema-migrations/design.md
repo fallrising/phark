@@ -58,6 +58,11 @@ else:
 Guard 使用 connection metadata / SQLite `PRAGMA table_info(posts)`，不得依賴
 application repository，因為此時 schema 可能尚未完成。
 
+Inspection connection 必須在呼叫 `flyway.baseline()` / `flyway.migrate()` 之前
+關閉。Production Hikari pool 大小為 1；若持有 inspection connection 再讓 Flyway
+借用第二條 connection，啟動會因 pool timeout 失敗。Migration integration tests
+使用相同的單連線 pool 防止回歸。
+
 若 `replies` 已存在，V3 使用 `CREATE TABLE/INDEX IF NOT EXISTS`。若名稱相同但結構
 不相容，migration integration test 與後續 repository queries 會使啟動失敗；
 runbook 要求此時還原備份，不可自動 repair。

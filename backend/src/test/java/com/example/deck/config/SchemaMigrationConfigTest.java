@@ -3,6 +3,7 @@ package com.example.deck.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.zaxxer.hikari.HikariDataSource;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -37,19 +38,23 @@ class SchemaMigrationConfigTest {
         }
     }
 
-    private Flyway createFlyway() {
-        return Flyway.configure()
-                .dataSource(url, "", "")
-                .locations("classpath:db/migration")
-                .baselineVersion("1")
-                .validateOnMigrate(true)
-                .validateMigrationNaming(true)
-                .cleanDisabled(true)
-                .load();
-    }
-
     private void runMigration() {
-        new SchemaMigrationConfig().guardedLegacyBaseline().migrate(createFlyway());
+        try (HikariDataSource dataSource = new HikariDataSource()) {
+            dataSource.setJdbcUrl(url);
+            dataSource.setDriverClassName("org.sqlite.JDBC");
+            dataSource.setMaximumPoolSize(1);
+
+            Flyway flyway = Flyway.configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/migration")
+                    .baselineVersion("1")
+                    .validateOnMigrate(true)
+                    .validateMigrationNaming(true)
+                    .cleanDisabled(true)
+                    .load();
+
+            new SchemaMigrationConfig().guardedLegacyBaseline().migrate(flyway);
+        }
     }
 
     private List<String[]> queryHistory() throws Exception {

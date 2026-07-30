@@ -23,17 +23,19 @@ public class SchemaMigrationConfig {
         return flyway -> {
             Configuration configuration = flyway.getConfiguration();
             DataSource dataSource = configuration.getDataSource();
+            boolean shouldBaseline;
 
             try (Connection connection = dataSource.getConnection()) {
-                if (!tableExists(connection, configuration.getTable())
-                        && hasLegacyPostSchema(connection)) {
-                    flyway.baseline();
-                }
+                shouldBaseline = !tableExists(connection, configuration.getTable())
+                        && hasLegacyPostSchema(connection);
             } catch (SQLException exception) {
                 throw new IllegalStateException(
                         "Failed to inspect the database before migration", exception);
             }
 
+            if (shouldBaseline) {
+                flyway.baseline();
+            }
             flyway.migrate();
         };
     }
