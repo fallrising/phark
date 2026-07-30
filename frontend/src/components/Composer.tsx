@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { LayoutGrid, Send } from "lucide-react"
 
-import { createPost } from "@/api/posts"
+import { createPost, getApiErrorMessage } from "@/api/posts"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -52,8 +52,8 @@ export function Composer({ onPostCreated }: ComposerProps) {
       })
       setContent("")
       await onPostCreated()
-    } catch {
-      setError("Unable to publish post. Please try again.")
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Unable to publish post. Please try again."))
     } finally {
       setSubmitting(false)
     }

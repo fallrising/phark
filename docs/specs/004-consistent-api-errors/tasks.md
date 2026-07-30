@@ -54,18 +54,18 @@
 
 ## D：Frontend error handling
 
-- [ ] **D.1 Client contract**
-  - [ ] D.1.1 定義 `ApiProblem`、`ApiError`、`Violation`。
-  - [ ] D.1.2 實作 Problem Details parse 與 malformed fallback。
-  - [ ] D.1.3 四個 fetch functions 共用 handler。
-- [ ] **D.2 UI wiring**
-  - [ ] D.2.1 timeline/load-more 顯示安全 detail。
-  - [ ] D.2.2 post composer 顯示安全 detail。
-  - [ ] D.2.3 replies load/composer 顯示安全 detail。
-- [ ] **D.3 Frontend gate**
-  - [ ] D.3.1 執行 lint。
-  - [ ] D.3.2 執行 TypeScript production build。
-  - [ ] D.3.3 保留 network、unknown 與 malformed body generic fallback。
+- [x] **D.1 Client contract**
+  - [x] D.1.1 定義 `ApiProblem`、`ApiError`、`Violation`。
+  - [x] D.1.2 實作 Problem Details parse 與 malformed fallback。
+  - [x] D.1.3 四個 fetch functions 共用 handler。
+- [x] **D.2 UI wiring**
+  - [x] D.2.1 timeline/load-more 顯示安全 detail。
+  - [x] D.2.2 post composer 顯示安全 detail。
+  - [x] D.2.3 replies load/composer 顯示安全 detail。
+- [x] **D.3 Frontend gate**
+  - [x] D.3.1 執行 lint。
+  - [x] D.3.2 執行 TypeScript production build。
+  - [x] D.3.3 保留 network、unknown 與 malformed body generic fallback。
 
 ## E：文件與整合驗證
 
