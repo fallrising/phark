@@ -69,15 +69,15 @@
 
 ## E：文件與整合驗證
 
-- [ ] **E.1 開發文件**
-  - [ ] E.1.1 在 API docs 記錄 error schema/codes。
-  - [ ] E.1.2 記錄 request ID header 與 debug 用法。
-  - [ ] E.1.3 同步 roadmap 與本任務證據。
-- [ ] **E.2 Production-like validation**
-  - [ ] E.2.1 Docker multi-stage build。
-  - [ ] E.2.2 成功 request correlation smoke。
-  - [ ] E.2.3 400/404 Problem Details smoke。
+- [x] **E.1 開發文件**
+  - [x] E.1.1 在 API docs 記錄 error schema/codes。
+  - [x] E.1.2 記錄 request ID header 與 debug 用法。
+  - [x] E.1.3 同步 roadmap 與本任務證據。
+- [x] **E.2 Production-like validation**
+  - [x] E.2.1 Docker multi-stage build。
+  - [x] E.2.2 成功 request correlation smoke。
+  - [x] E.2.3 400/404 Problem Details smoke。
 - [ ] **E.3 CI 與交付**
-  - [ ] E.3.1 推送所有階段 commits。
+  - [x] E.3.1 推送所有階段 commits。
   - [ ] E.3.2 GitHub Actions 全綠。
   - [ ] E.3.3 更新 verification evidence 並完成 SDD-004。

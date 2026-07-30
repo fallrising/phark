@@ -15,9 +15,11 @@ phark/
 │       │   │   ├── config/       # DatabaseConfig, SchemaMigrationConfig, WebConfig
 │       │   │   ├── controller/   # PostController, ReplyController
 │       │   │   ├── dto/          # CreatePostRequest, CreateReplyRequest
+│       │   │   ├── error/        # RFC 9457 codes、exception mapper、violations
 │       │   │   ├── model/        # Post, Reply 與 page contracts
 │       │   │   ├── repository/   # PostRepository, ReplyRepository (JdbcClient)
-│       │   │   └── service/      # PostService, ReplyService
+│       │   │   ├── service/      # PostService, ReplyService
+│       │   │   └── web/          # Request correlation filter
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       ├── application-prod.properties
@@ -144,6 +146,59 @@ parent post 回傳 `404`，無效 post id、limit 或 cursor 回傳 `400`。
 author 與 content 的 validation 規則和文章相同。`replyCount` 由後端計算，
 建立成功後再次讀取 timeline 即會增加。
 
+### API 錯誤契約
+
+所有 `/api/**` 非 2xx response 使用 RFC 9457 Problem Details，Content-Type 為
+`application/problem+json`：
+
+```json
+{
+  "type": "urn:phark:problem:validation-failed",
+  "title": "Validation failed",
+  "status": 400,
+  "detail": "One or more request fields are invalid.",
+  "instance": "/api/posts",
+  "code": "VALIDATION_FAILED",
+  "requestId": "req-example-123",
+  "violations": [
+    {
+      "field": "content",
+      "message": "content must not be blank"
+    }
+  ]
+}
+```
+
+Client 應以 `code` 判斷流程，不解析 `title`、`detail` 或 validation message。
+`detail` 是可顯示文字；`violations` 只在欄位驗證失敗時存在。未知 extension
+members 必須忽略。
+
+| Code | HTTP | 說明 |
+|------|------|------|
+| `VALIDATION_FAILED` | 400 | request body 欄位 constraint 失敗 |
+| `INVALID_CHANNEL` | 400 | channel 不在允許清單 |
+| `INVALID_LIMIT` | 400 | limit 不是整數或不在 1–100 |
+| `INVALID_CURSOR` | 400 | timeline/replies cursor 不合法 |
+| `INVALID_POST_ID` | 400 | post ID 不是正整數 |
+| `MALFORMED_REQUEST` | 400 | request body 缺失、語法錯誤或無法讀取 |
+| `POST_NOT_FOUND` | 404 | 指定文章不存在 |
+| `RESOURCE_NOT_FOUND` | 404 | API route/resource 不存在 |
+| `METHOD_NOT_ALLOWED` | 405 | HTTP method 不支援 |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | request Content-Type 不支援 |
+| `INTERNAL_ERROR` | 500 | 未預期錯誤；不回傳內部 exception details |
+
+每個 response（成功或失敗）都有 `X-Request-ID`。Client 可提供符合
+`[A-Za-z0-9._-]{1,64}` 的值；缺失或不合法時 server 會產生 UUID。Error body 的
+`requestId` 與 response header 相同。支援或除錯時可固定 ID：
+
+```bash
+curl -i 'http://127.0.0.1:8080/api/posts?channel=news' \
+  -H 'X-Request-ID: local-debug-123'
+```
+
+Request ID 只用於關聯 response 與 server log，不是 authentication 或可信資料。
+未知 500 對外只回傳固定安全 detail，完整 exception 只記錄於 server log。
+
 ### Seed Data
 
 啟動時若資料庫無文章，自動建立至少 9 筆（每個 channel 各 3 筆）。邏輯位於 `PostService.seedData()`。
@@ -257,7 +312,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 | 範圍 | 命令 | 覆蓋 |
 |------|------|------|
-| Backend | `mvn -f backend/pom.xml test` | posts/replies、migration upgrade、fail-closed、cursor、validation |
+| Backend | `mvn -f backend/pom.xml test` | posts/replies、migration、cursor、Problem Details、correlation、validation |
 | Frontend lint | `npm run lint`（在 `frontend/`） | oxlint |
 | Frontend build | `npm run build`（在 `frontend/`） | TypeScript + Vite |
 | 整合 | `docker build -t stream-deck .` | 含 frontend lint/build + Maven test |
