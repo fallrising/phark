@@ -35,18 +35,18 @@
 
 ## C：Session authentication 與 CSRF
 
-- [ ] **C.1 RED — Security contract**
-  - [ ] C.1.1 測試 CSRF token 取得、缺失拒絕與無副作用。
-  - [ ] C.1.2 測試 registration/login generic failure/session persistence。
-  - [ ] C.1.3 測試 session-ID rotation、logout invalidation 與 cookie attributes。
-- [ ] **C.2 GREEN — Spring Security wiring**
-  - [ ] C.2.1 新增 starter/test dependency、filter chain 與 route policy。
-  - [ ] C.2.2 實作 UserDetails、AuthenticationManager 與 session repository。
-  - [ ] C.2.3 實作 RFC 9457 authentication entry point/access denied handler。
-- [ ] **C.3 GREEN/REFACTOR — Auth API**
-  - [ ] C.3.1 實作 csrf/register/login/logout/session endpoints。
-  - [ ] C.3.2 確保 password/session/CSRF secrets 不進 response 或 log。
-  - [ ] C.3.3 執行 focused security tests 與完整 backend regression。
+- [x] **C.1 RED — Security contract**
+  - [x] C.1.1 測試 CSRF token 取得、缺失拒絕與無副作用。
+  - [x] C.1.2 測試 registration/login generic failure/session persistence。
+  - [x] C.1.3 測試 session-ID rotation、logout invalidation 與 cookie attributes。
+- [x] **C.2 GREEN — Spring Security wiring**
+  - [x] C.2.1 新增 starter/test dependency、filter chain 與 route policy。
+  - [x] C.2.2 實作 UserDetails、AuthenticationManager 與 session repository。
+  - [x] C.2.3 實作 RFC 9457 authentication entry point/access denied handler。
+- [x] **C.3 GREEN/REFACTOR — Auth API**
+  - [x] C.3.1 實作 csrf/register/login/logout/session endpoints。
+  - [x] C.3.2 確保 password/session/CSRF secrets 不進 response 或 log。
+  - [x] C.3.3 執行 focused security tests 與完整 backend regression。
 
 ## D：Authenticated authorship 與 profile API
 

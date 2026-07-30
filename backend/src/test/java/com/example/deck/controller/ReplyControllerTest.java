@@ -3,6 +3,8 @@ package com.example.deck.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -69,6 +71,8 @@ class ReplyControllerTest {
                 """;
 
         mockMvc.perform(post(repliesUrl(parent.id()))
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
@@ -112,6 +116,8 @@ class ReplyControllerTest {
         mockMvc.perform(get(repliesUrl(missingId)))
                 .andExpect(status().isNotFound());
         mockMvc.perform(post(repliesUrl(missingId))
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody()))
                 .andExpect(status().isNotFound());
@@ -123,6 +129,8 @@ class ReplyControllerTest {
         mockMvc.perform(get("/api/posts/" + postId + "/replies"))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(post("/api/posts/" + postId + "/replies")
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody()))
                 .andExpect(status().isBadRequest());
@@ -157,6 +165,8 @@ class ReplyControllerTest {
                 """;
 
         mockMvc.perform(post(repliesUrl(parent.id()))
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());

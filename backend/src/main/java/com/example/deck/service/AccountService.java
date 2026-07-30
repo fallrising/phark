@@ -7,6 +7,7 @@ import com.example.deck.model.AccountProfile;
 import com.example.deck.repository.AccountRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,7 +31,7 @@ public class AccountService {
     }
 
     public AccountProfile register(String handle, String displayName, String password) {
-        String canonicalHandle = canonicalHandle(handle);
+        String canonicalHandle = canonicalizeHandle(handle);
         String normalizedDisplayName = normalizeDisplayName(displayName);
         validatePassword(password);
 
@@ -59,7 +60,11 @@ public class AccountService {
                 accountId, normalizedDisplayName, normalizedBio));
     }
 
-    private String canonicalHandle(String handle) {
+    public Optional<AccountProfile> findProfileById(long accountId) {
+        return accountRepository.findById(accountId).map(this::toProfile);
+    }
+
+    public String canonicalizeHandle(String handle) {
         if (handle == null) {
             throw validationFailed();
         }

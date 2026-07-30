@@ -2,7 +2,6 @@ package com.example.deck.error;
 
 import com.example.deck.web.RequestIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -29,10 +28,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
+    private final ApiProblemWriter problemWriter;
+
+    public ApiExceptionHandler(ApiProblemWriter problemWriter) {
+        this.problemWriter = problemWriter;
+    }
+
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<Object> handleApiException(ApiException ex, HttpServletRequest request) {
         ApiErrorCode code = ex.getCode();
-        ProblemDetail problem = buildProblemDetail(
+        ProblemDetail problem = problemWriter.build(
                 code,
                 request.getRequestURI(),
                 ex.getDetail(),
@@ -51,7 +56,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .map(fe -> new ApiViolation(fe.getField(), fe.getDefaultMessage()))
                 .sorted()
                 .toList();
-        ProblemDetail problem = buildProblemDetail(
+        ProblemDetail problem = problemWriter.build(
                 code,
                 getRequestPath(request),
                 code.getDefaultDetail(),
@@ -71,7 +76,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 default -> ApiErrorCode.MALFORMED_REQUEST;
             };
         }
-        ProblemDetail problem = buildProblemDetail(
+        ProblemDetail problem = problemWriter.build(
                 code,
                 getRequestPath(request),
                 code.getDefaultDetail(),
@@ -86,7 +91,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request) {
         ApiErrorCode code = ApiErrorCode.MALFORMED_REQUEST;
-        ProblemDetail problem = buildProblemDetail(
+        ProblemDetail problem = problemWriter.build(
                 code,
                 getRequestPath(request),
                 code.getDefaultDetail(),
@@ -101,7 +106,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request) {
         ApiErrorCode code = ApiErrorCode.UNSUPPORTED_MEDIA_TYPE;
-        ProblemDetail problem = buildProblemDetail(
+        ProblemDetail problem = problemWriter.build(
                 code,
                 getRequestPath(request),
                 code.getDefaultDetail(),
@@ -116,7 +121,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request) {
         ApiErrorCode code = ApiErrorCode.METHOD_NOT_ALLOWED;
-        ProblemDetail problem = buildProblemDetail(
+        ProblemDetail problem = problemWriter.build(
                 code,
                 getRequestPath(request),
                 code.getDefaultDetail(),
@@ -131,7 +136,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request) {
         ApiErrorCode code = ApiErrorCode.RESOURCE_NOT_FOUND;
-        ProblemDetail problem = buildProblemDetail(
+        ProblemDetail problem = problemWriter.build(
                 code,
                 getRequestPath(request),
                 code.getDefaultDetail(),
@@ -144,27 +149,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         String requestId = RequestIdFilter.resolveRequestId(request);
         log.error("Unhandled API exception [requestId={}]", requestId, ex);
         ApiErrorCode code = ApiErrorCode.INTERNAL_ERROR;
-        ProblemDetail problem = buildProblemDetail(
+        ProblemDetail problem = problemWriter.build(
                 code,
                 request.getRequestURI(),
                 code.getDefaultDetail(),
                 requestId);
         return new ResponseEntity<>(problem, code.getHttpStatus());
-    }
-
-    private static ProblemDetail buildProblemDetail(
-            ApiErrorCode code,
-            String path,
-            String detail,
-            String requestId) {
-        ProblemDetail problem = ProblemDetail.forStatus(code.getHttpStatus());
-        problem.setType(code.getType());
-        problem.setTitle(code.getTitle());
-        problem.setDetail(detail);
-        problem.setInstance(URI.create(path));
-        problem.setProperty("code", code.name());
-        problem.setProperty("requestId", requestId);
-        return problem;
     }
 
     private static String getRequestPath(WebRequest request) {

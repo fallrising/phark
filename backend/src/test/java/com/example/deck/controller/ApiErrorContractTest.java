@@ -6,6 +6,8 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -70,6 +72,8 @@ class ApiErrorContractTest {
                 """;
 
         mockMvc.perform(post("/api/posts")
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(problemDetails(
@@ -165,6 +169,8 @@ class ApiErrorContractTest {
     @Test
     void malformedJsonReturnsProblemDetails() throws Exception {
         mockMvc.perform(post("/api/posts")
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{invalid"))
                 .andExpect(problemDetails(
@@ -176,6 +182,8 @@ class ApiErrorContractTest {
     @Test
     void unsupportedMediaTypeReturnsProblemDetails() throws Exception {
         mockMvc.perform(post("/api/posts")
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.TEXT_PLAIN)
                         .content("not json"))
                 .andExpect(problemDetails(
@@ -188,7 +196,7 @@ class ApiErrorContractTest {
 
     @Test
     void methodNotAllowedReturnsProblemDetails() throws Exception {
-        mockMvc.perform(patch("/api/posts"))
+        mockMvc.perform(patch("/api/posts").with(csrf()))
                 .andExpect(problemDetails(
                         405, "method-not-allowed", "Method not allowed",
                         "METHOD_NOT_ALLOWED", "/api/posts"))
