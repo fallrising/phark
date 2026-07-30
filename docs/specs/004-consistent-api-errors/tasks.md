@@ -39,18 +39,18 @@
 
 ## C：Request correlation
 
-- [ ] **C.1 RED — Filter contract tests**
-  - [ ] C.1.1 成功 response 沿用合法 inbound ID。
-  - [ ] C.1.2 error header/body 使用相同 ID。
-  - [ ] C.1.3 缺失或不合法 ID 產生安全 UUID。
-- [ ] **C.2 GREEN — RequestIdFilter**
-  - [ ] C.2.1 實作 allowlist、attribute、response header。
-  - [ ] C.2.2 設定並在 `finally` 清除 MDC。
-  - [ ] C.2.3 讓 error handler 使用 filter attribute。
-- [ ] **C.3 REFACTOR — Logging safety**
-  - [ ] C.3.1 驗證 newline、過長 header 不會被沿用。
-  - [ ] C.3.2 驗證 500 log path 帶 request ID。
-  - [ ] C.3.3 執行完整 backend tests。
+- [x] **C.1 RED — Filter contract tests**
+  - [x] C.1.1 成功 response 沿用合法 inbound ID。
+  - [x] C.1.2 error header/body 使用相同 ID。
+  - [x] C.1.3 缺失或不合法 ID 產生安全 UUID。
+- [x] **C.2 GREEN — RequestIdFilter**
+  - [x] C.2.1 實作 allowlist、attribute、response header。
+  - [x] C.2.2 設定並在 `finally` 清除 MDC。
+  - [x] C.2.3 讓 error handler 使用 filter attribute。
+- [x] **C.3 REFACTOR — Logging safety**
+  - [x] C.3.1 驗證 newline、過長 header 不會被沿用。
+  - [x] C.3.2 驗證 500 log path 帶 request ID。
+  - [x] C.3.3 執行完整 backend tests。
 
 ## D：Frontend error handling
 

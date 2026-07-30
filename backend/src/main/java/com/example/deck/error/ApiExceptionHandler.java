@@ -1,8 +1,10 @@
 package com.example.deck.error;
 
+import com.example.deck.web.RequestIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
@@ -30,7 +32,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<Object> handleApiException(ApiException ex, HttpServletRequest request) {
         ApiErrorCode code = ex.getCode();
-        ProblemDetail problem = buildProblemDetail(code, request.getRequestURI(), ex.getDetail());
+        ProblemDetail problem = buildProblemDetail(
+                code,
+                request.getRequestURI(),
+                ex.getDetail(),
+                RequestIdFilter.resolveRequestId(request));
         return new ResponseEntity<>(problem, code.getHttpStatus());
     }
 
@@ -45,7 +51,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .map(fe -> new ApiViolation(fe.getField(), fe.getDefaultMessage()))
                 .sorted()
                 .toList();
-        ProblemDetail problem = buildProblemDetail(code, getRequestPath(request), code.getDefaultDetail());
+        ProblemDetail problem = buildProblemDetail(
+                code,
+                getRequestPath(request),
+                code.getDefaultDetail(),
+                resolveRequestId(request));
         problem.setProperty("violations", violations);
         return handleExceptionInternal(ex, problem, headers, code.getHttpStatus(), request);
     }
@@ -61,7 +71,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 default -> ApiErrorCode.MALFORMED_REQUEST;
             };
         }
-        ProblemDetail problem = buildProblemDetail(code, getRequestPath(request), code.getDefaultDetail());
+        ProblemDetail problem = buildProblemDetail(
+                code,
+                getRequestPath(request),
+                code.getDefaultDetail(),
+                resolveRequestId(request));
         return handleExceptionInternal(ex, problem, headers, code.getHttpStatus(), request);
     }
 
@@ -72,7 +86,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request) {
         ApiErrorCode code = ApiErrorCode.MALFORMED_REQUEST;
-        ProblemDetail problem = buildProblemDetail(code, getRequestPath(request), code.getDefaultDetail());
+        ProblemDetail problem = buildProblemDetail(
+                code,
+                getRequestPath(request),
+                code.getDefaultDetail(),
+                resolveRequestId(request));
         return handleExceptionInternal(ex, problem, headers, code.getHttpStatus(), request);
     }
 
@@ -83,7 +101,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request) {
         ApiErrorCode code = ApiErrorCode.UNSUPPORTED_MEDIA_TYPE;
-        ProblemDetail problem = buildProblemDetail(code, getRequestPath(request), code.getDefaultDetail());
+        ProblemDetail problem = buildProblemDetail(
+                code,
+                getRequestPath(request),
+                code.getDefaultDetail(),
+                resolveRequestId(request));
         return handleExceptionInternal(ex, problem, headers, code.getHttpStatus(), request);
     }
 
@@ -94,7 +116,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request) {
         ApiErrorCode code = ApiErrorCode.METHOD_NOT_ALLOWED;
-        ProblemDetail problem = buildProblemDetail(code, getRequestPath(request), code.getDefaultDetail());
+        ProblemDetail problem = buildProblemDetail(
+                code,
+                getRequestPath(request),
+                code.getDefaultDetail(),
+                resolveRequestId(request));
         return handleExceptionInternal(ex, problem, headers, code.getHttpStatus(), request);
     }
 
@@ -105,25 +131,39 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request) {
         ApiErrorCode code = ApiErrorCode.RESOURCE_NOT_FOUND;
-        ProblemDetail problem = buildProblemDetail(code, getRequestPath(request), code.getDefaultDetail());
+        ProblemDetail problem = buildProblemDetail(
+                code,
+                getRequestPath(request),
+                code.getDefaultDetail(),
+                resolveRequestId(request));
         return handleExceptionInternal(ex, problem, headers, code.getHttpStatus(), request);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleAllUnhandled(Exception ex, HttpServletRequest request) {
-        log.error("Unhandled exception: {}", ex.getMessage(), ex);
+        String requestId = RequestIdFilter.resolveRequestId(request);
+        log.error("Unhandled API exception [requestId={}]", requestId, ex);
         ApiErrorCode code = ApiErrorCode.INTERNAL_ERROR;
-        ProblemDetail problem = buildProblemDetail(code, request.getRequestURI(), code.getDefaultDetail());
+        ProblemDetail problem = buildProblemDetail(
+                code,
+                request.getRequestURI(),
+                code.getDefaultDetail(),
+                requestId);
         return new ResponseEntity<>(problem, code.getHttpStatus());
     }
 
-    private static ProblemDetail buildProblemDetail(ApiErrorCode code, String path, String detail) {
+    private static ProblemDetail buildProblemDetail(
+            ApiErrorCode code,
+            String path,
+            String detail,
+            String requestId) {
         ProblemDetail problem = ProblemDetail.forStatus(code.getHttpStatus());
         problem.setType(code.getType());
         problem.setTitle(code.getTitle());
         problem.setDetail(detail);
         problem.setInstance(URI.create(path));
         problem.setProperty("code", code.name());
+        problem.setProperty("requestId", requestId);
         return problem;
     }
 
@@ -132,5 +172,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             return swr.getRequest().getRequestURI();
         }
         return request.getDescription(false).replace("uri=", "");
+    }
+
+    private static String resolveRequestId(WebRequest request) {
+        if (request instanceof ServletWebRequest swr) {
+            return RequestIdFilter.resolveRequestId(swr.getRequest());
+        }
+        return UUID.randomUUID().toString();
     }
 }

@@ -153,12 +153,12 @@ And body 無法解析時仍使用既有 generic fallback。
 
 ## 驗收條件
 
-- [ ] 文件中的所有 error codes 都有 backend contract tests。
-- [ ] validation response 含 deterministic `violations`。
-- [ ] domain services 不再用 `ResponseStatusException` 表達已知業務錯誤。
-- [ ] malformed JSON、type mismatch、404、405、415 與未知 500 使用同一 body shape。
-- [ ] 合法 inbound request ID 被沿用；不合法值被安全替換。
-- [ ] 成功與錯誤 response 都有 `X-Request-ID`。
+- [x] 文件中的所有 error codes 都有 backend contract tests。
+- [x] validation response 含 deterministic `violations`。
+- [x] domain services 不再用 `ResponseStatusException` 表達已知業務錯誤。
+- [x] malformed JSON、type mismatch、404、405、415 與未知 500 使用同一 body shape。
+- [x] 合法 inbound request ID 被沿用；不合法值被安全替換。
+- [x] 成功與錯誤 response 都有 `X-Request-ID`。
 - [ ] frontend 能解析 Problem Details 且保留 generic fallback。
 - [ ] backend tests、frontend lint/build、Docker/runtime smoke 與 GitHub Actions 通過。
 

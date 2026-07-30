@@ -23,7 +23,7 @@
 - [~] **SDD-004 — Consistent API errors**
   - [x] RFC 9457 Problem Details
   - [x] validation field errors
-  - [ ] request correlation ID
+  - [x] request correlation ID
 
 ## P1：社交核心
 
