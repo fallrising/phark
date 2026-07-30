@@ -74,7 +74,7 @@ history。本輪必須同時支援空資料庫和原地升級，不得要求清�
 - [x] 舊 indexes 被移除，cursor/conversation indexes 存在。
 - [x] `schema.sql` 與 `spring.sql.init.*` 不再負責 schema 管理。
 - [x] 既有 backend controller/repository tests 全部通過。
-- [ ] 備份、驗證、復原 runbook 可按 production 路徑操作。
+- [x] 備份、驗證、復原 runbook 可按 production 路徑操作。
 - [ ] Docker build、production runtime smoke 與 GitHub Actions 全部通過。
 
 ## 參考

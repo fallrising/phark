@@ -5,6 +5,8 @@
 本指南描述如何將 **Stream Deck**（repository：`fallrising/phark`）部署到單台 Ubuntu VPS，實現可重現、可回滾的 CI/CD 流程。
 
 部署設定模板位於 [`deploy/templates/`](../deploy/templates/)。
+含 schema 變更的 release 必須另依
+[MIGRATIONS.md](./MIGRATIONS.md) 完成停機備份、history 驗證與失敗復原。
 
 ## 假設與常數
 

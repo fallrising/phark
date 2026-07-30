@@ -17,9 +17,9 @@
   - [x] Docker、runtime 與 CI 驗收
 - [~] **SDD-003 — Schema migrations**
   - [x] migration history、legacy baseline 與 fail-closed 規格
-  - [ ] 導入 Flyway
-  - [ ] 將現有 schema 建立為 baseline migration
-  - [ ] migration rollback/restore runbook
+  - [x] 導入 Flyway
+  - [x] 將現有 schema 建立為 baseline migration
+  - [x] migration rollback/restore runbook
 - [ ] **SDD-004 — Consistent API errors**
   - [ ] RFC 9457 Problem Details
   - [ ] validation field errors

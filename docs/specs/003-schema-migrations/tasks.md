@@ -26,10 +26,10 @@
 
 ## 階段 D：操作文件
 
-- [ ] 新增 migration authoring rules。
-- [ ] 新增 production preflight/backup steps。
-- [ ] 新增 history verification steps。
-- [ ] 新增 failed migration restore steps。
+- [x] 新增 migration authoring rules。
+- [x] 新增 production preflight/backup steps。
+- [x] 新增 history verification steps。
+- [x] 新增 failed migration restore steps。
 
 ## 階段 E：整合驗證
 
