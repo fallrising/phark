@@ -1,6 +1,6 @@
 # 004：一致的 API 錯誤契約
 
-> 狀態：In progress
+> 狀態：Completed
 > 日期：2026-07-30
 
 ## 問題
@@ -160,7 +160,7 @@ And body 無法解析時仍使用既有 generic fallback。
 - [x] 合法 inbound request ID 被沿用；不合法值被安全替換。
 - [x] 成功與錯誤 response 都有 `X-Request-ID`。
 - [x] frontend 能解析 Problem Details 且保留 generic fallback。
-- [ ] backend tests、frontend lint/build、Docker/runtime smoke 與 GitHub Actions 通過。
+- [x] backend tests、frontend lint/build、Docker/runtime smoke 與 GitHub Actions 通過。
 
 ## 參考
 

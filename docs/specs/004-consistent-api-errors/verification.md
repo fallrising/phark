@@ -75,5 +75,9 @@ Content-Type: application/problem+json
 
 ## GitHub Actions
 
-等待本文件所在的 checkpoint 推送後執行。最終 green run 與 commit SHA 將在
-SDD-004 完成前補入。
+- Commit：`95ad46403ca3b25660ce815eb7b7a50b5acec66d`
+- Workflow job：[Build container image](https://github.com/fallrising/phark/actions/runs/30554948797/job/90912897079)
+- 結果：1 successful、0 failing、0 skipped
+
+此 job 從乾淨的 GitHub runner 執行 production multi-stage Docker build，涵蓋
+frontend lint/build 與完整 backend test suite。

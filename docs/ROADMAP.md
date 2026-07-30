@@ -20,7 +20,7 @@
   - [x] 導入 Flyway
   - [x] 將現有 schema 建立為 baseline migration
   - [x] migration rollback/restore runbook
-- [~] **SDD-004 — Consistent API errors**
+- [x] **SDD-004 — Consistent API errors**
   - [x] RFC 9457 Problem Details
   - [x] validation field errors
   - [x] request correlation ID

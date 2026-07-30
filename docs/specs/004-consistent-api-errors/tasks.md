@@ -77,7 +77,7 @@
   - [x] E.2.1 Docker multi-stage build。
   - [x] E.2.2 成功 request correlation smoke。
   - [x] E.2.3 400/404 Problem Details smoke。
-- [ ] **E.3 CI 與交付**
+- [x] **E.3 CI 與交付**
   - [x] E.3.1 推送所有階段 commits。
-  - [ ] E.3.2 GitHub Actions 全綠。
-  - [ ] E.3.3 更新 verification evidence 並完成 SDD-004。
+  - [x] E.3.2 GitHub Actions 全綠。
+  - [x] E.3.3 更新 verification evidence 並完成 SDD-004。
