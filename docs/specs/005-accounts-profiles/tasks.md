@@ -20,18 +20,18 @@
 
 ## B：Schema 與 account persistence
 
-- [ ] **B.1 RED — V4 migration contract**
-  - [ ] B.1.1 測試 empty database 建立 accounts 與 ownership columns/indexes。
-  - [ ] B.1.2 測試 V3 database 保留 posts/replies/IDs/timestamps。
-  - [ ] B.1.3 測試 legacy baseline upgrade 且 ownership 保持 null。
-- [ ] **B.2 GREEN — Account schema/repository**
-  - [ ] B.2.1 新增 immutable `V4__add_accounts_and_ownership.sql`。
-  - [ ] B.2.2 新增 account domain/public profile models 與 repository。
-  - [ ] B.2.3 驗證 case-insensitive unique handle 與 profile update。
-- [ ] **B.3 GREEN/REFACTOR — Account service**
-  - [ ] B.3.1 實作 canonical handle/profile validation。
-  - [ ] B.3.2 以 delegating BCrypt encoder 保存並驗證 password。
-  - [ ] B.3.3 執行 focused migration/repository/service 與完整 regression tests。
+- [x] **B.1 RED — V4 migration contract**
+  - [x] B.1.1 測試 empty database 建立 accounts 與 ownership columns/indexes。
+  - [x] B.1.2 測試 V3 database 保留 posts/replies/IDs/timestamps。
+  - [x] B.1.3 測試 legacy baseline upgrade 且 ownership 保持 null。
+- [x] **B.2 GREEN — Account schema/repository**
+  - [x] B.2.1 新增 immutable `V4__add_accounts_and_ownership.sql`。
+  - [x] B.2.2 新增 account domain/public profile models 與 repository。
+  - [x] B.2.3 驗證 case-insensitive unique handle 與 profile update。
+- [x] **B.3 GREEN/REFACTOR — Account service**
+  - [x] B.3.1 實作 canonical handle/profile validation。
+  - [x] B.3.2 以 delegating BCrypt encoder 保存並驗證 password。
+  - [x] B.3.3 執行 focused migration/repository/service 與完整 regression tests。
 
 ## C：Session authentication 與 CSRF
 

@@ -17,6 +17,8 @@ public enum ApiErrorCode {
             "Invalid post ID", "Post ID must be a positive integer."),
     MALFORMED_REQUEST("urn:phark:problem:malformed-request", HttpStatus.BAD_REQUEST,
             "Malformed request", "The request body is missing or malformed."),
+    HANDLE_UNAVAILABLE("urn:phark:problem:handle-unavailable", HttpStatus.CONFLICT,
+            "Handle unavailable", "The requested handle is not available."),
     POST_NOT_FOUND("urn:phark:problem:post-not-found", HttpStatus.NOT_FOUND,
             "Post not found", "The requested post does not exist."),
     RESOURCE_NOT_FOUND("urn:phark:problem:resource-not-found", HttpStatus.NOT_FOUND,
