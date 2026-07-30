@@ -67,13 +67,13 @@ history。本輪必須同時支援空資料庫和原地升級，不得要求清�
 
 ## 驗收條件
 
-- [ ] 空資料庫啟動後存在 posts、replies、最新 indexes 與成功的 V1–V3 history。
-- [ ] 只有 legacy posts schema 的資料庫可 baseline 並升級，原資料與 ID 保留。
-- [ ] 已含 replies、但沒有 history 的 current schema 可 baseline 並保留回覆。
-- [ ] 不相關的非空 SQLite database 不會被自動 baseline。
-- [ ] 舊 indexes 被移除，cursor/conversation indexes 存在。
-- [ ] `schema.sql` 與 `spring.sql.init.*` 不再負責 schema 管理。
-- [ ] 既有 backend controller/repository tests 全部通過。
+- [x] 空資料庫啟動後存在 posts、replies、最新 indexes 與成功的 V1–V3 history。
+- [x] 只有 legacy posts schema 的資料庫可 baseline 並升級，原資料與 ID 保留。
+- [x] 已含 replies、但沒有 history 的 current schema 可 baseline 並保留回覆。
+- [x] 不相關的非空 SQLite database 不會被自動 baseline。
+- [x] 舊 indexes 被移除，cursor/conversation indexes 存在。
+- [x] `schema.sql` 與 `spring.sql.init.*` 不再負責 schema 管理。
+- [x] 既有 backend controller/repository tests 全部通過。
 - [ ] 備份、驗證、復原 runbook 可按 production 路徑操作。
 - [ ] Docker build、production runtime smoke 與 GitHub Actions 全部通過。
 

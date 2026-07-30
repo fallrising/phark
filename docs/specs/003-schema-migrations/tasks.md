@@ -9,20 +9,20 @@
 
 ## 階段 B：Flyway vertical slice
 
-- [ ] 加入 Spring Boot 管理的 Flyway dependency。
-- [ ] 將 `schema.sql` 拆成 V1、V2、V3。
-- [ ] 關閉 Spring SQL initializer。
-- [ ] 新增 guarded legacy baseline strategy。
-- [ ] 確保 migration 在 seed 與 repositories 之前完成。
+- [x] 加入 Spring Boot 管理的 Flyway dependency。
+- [x] 將 `schema.sql` 拆成 V1、V2、V3。
+- [x] 關閉 Spring SQL initializer。
+- [x] 新增 guarded legacy baseline strategy。
+- [x] 確保 migration 在 seed 與 repositories 之前完成。
 
 ## 階段 C：Migration tests
 
-- [ ] 空 database bootstrap test。
-- [ ] legacy posts baseline/data-preservation test。
-- [ ] current pre-Flyway replies preservation test。
-- [ ] unknown non-empty database fail-closed test。
-- [ ] 驗證 history、tables 與 indexes。
-- [ ] 既有 48 項 backend tests 通過。
+- [x] 空 database bootstrap test。
+- [x] legacy posts baseline/data-preservation test。
+- [x] current pre-Flyway replies preservation test。
+- [x] unknown non-empty database fail-closed test。
+- [x] 驗證 history、tables 與 indexes。
+- [x] 既有 48 項 backend tests 通過。
 
 ## 階段 D：操作文件
 
@@ -33,8 +33,8 @@
 
 ## 階段 E：整合驗證
 
-- [ ] Frontend lint/build 通過。
-- [ ] Docker build 通過。
+- [x] Frontend lint/build 通過。
+- [x] Docker build 通過。
 - [ ] Production container 空 volume smoke 通過。
 - [ ] Production container legacy volume upgrade smoke 通過。
 - [ ] GitHub Actions 通過。
