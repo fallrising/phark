@@ -65,18 +65,18 @@
 
 ## E：Frontend identity 與 profile experience
 
-- [ ] **E.1 API client boundary**
-  - [ ] E.1.1 抽出共用 Problem Details/same-origin fetch client。
-  - [ ] E.1.2 實作 in-memory CSRF lifecycle 與 fail-closed mutation。
-  - [ ] E.1.3 實作 accounts/session/profile typed API functions。
-- [ ] **E.2 Authentication/authorship UI**
-  - [ ] E.2.1 App boot 載入 CSRF/session，加入 register/login/logout flows。
-  - [ ] E.2.2 Composer 移除自由作者輸入並顯示目前 identity/登入提示。
-  - [ ] E.2.3 Reply composer 同步 session identity 並保留 error fallback。
-- [ ] **E.3 Profile UI 與 gate**
-  - [ ] E.3.1 實作 `/profiles/{handle}` view、author links 與 posts pagination。
-  - [ ] E.3.2 實作 owner display name/bio edit 與全頁 state refresh。
-  - [ ] E.3.3 執行 frontend lint、TypeScript 與 production build。
+- [x] **E.1 API client boundary**
+  - [x] E.1.1 抽出共用 Problem Details/same-origin fetch client。
+  - [x] E.1.2 實作 in-memory CSRF lifecycle 與 fail-closed mutation。
+  - [x] E.1.3 實作 accounts/session/profile typed API functions。
+- [x] **E.2 Authentication/authorship UI**
+  - [x] E.2.1 App boot 載入 CSRF/session，加入 register/login/logout flows。
+  - [x] E.2.2 Composer 移除自由作者輸入並顯示目前 identity/登入提示。
+  - [x] E.2.3 Reply composer 同步 session identity 並保留 error fallback。
+- [x] **E.3 Profile UI 與 gate**
+  - [x] E.3.1 實作 `/profiles/{handle}` view、author links 與 posts pagination。
+  - [x] E.3.2 實作 owner display name/bio edit 與全頁 state refresh。
+  - [x] E.3.3 執行 frontend lint、TypeScript 與 production build。
 
 ## F：文件與整合交付
 

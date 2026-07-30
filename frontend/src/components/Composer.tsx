@@ -2,8 +2,8 @@ import { useState, type FormEvent } from "react"
 import { LayoutGrid, Send } from "lucide-react"
 
 import { createPost, getApiErrorMessage } from "@/api/posts"
+import type { AccountProfile } from "@/api/accounts"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -16,11 +16,16 @@ import { Textarea } from "@/components/ui/textarea"
 import type { Channel } from "@/types/post"
 
 interface ComposerProps {
+  account: AccountProfile | null
+  onAuthRequest: () => void
   onPostCreated: () => Promise<void>
 }
 
-export function Composer({ onPostCreated }: ComposerProps) {
-  const [author, setAuthor] = useState("")
+export function Composer({
+  account,
+  onAuthRequest,
+  onPostCreated,
+}: ComposerProps) {
   const [content, setContent] = useState("")
   const [channel, setChannel] = useState<Channel>("home")
   const [error, setError] = useState<string | null>(null)
@@ -30,11 +35,14 @@ export function Composer({ onPostCreated }: ComposerProps) {
     event.preventDefault()
     setError(null)
 
-    const trimmedAuthor = author.trim()
     const trimmedContent = content.trim()
 
-    if (!trimmedAuthor || !trimmedContent) {
-      setError("Author and content are required.")
+    if (account === null) {
+      setError("Sign in before publishing a post.")
+      return
+    }
+    if (!trimmedContent) {
+      setError("Content is required.")
       return
     }
 
@@ -46,7 +54,6 @@ export function Composer({ onPostCreated }: ComposerProps) {
     setSubmitting(true)
     try {
       await createPost({
-        author: trimmedAuthor,
         content: trimmedContent,
         channel,
       })
@@ -74,56 +81,67 @@ export function Composer({ onPostCreated }: ComposerProps) {
           </div>
         </div>
 
-        <form
-          className="grid gap-4 rounded-2xl border border-border/70 bg-background p-4 shadow-sm md:grid-cols-[1fr_1fr_auto] md:items-end"
-          onSubmit={handleSubmit}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="author">Author</Label>
-            <Input
-              id="author"
-              placeholder="Your name"
-              value={author}
-              onChange={(event) => setAuthor(event.target.value)}
-              maxLength={80}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="channel">Channel</Label>
-            <Select value={channel} onValueChange={(value) => setChannel(value as Channel)}>
-              <SelectTrigger id="channel">
-                <SelectValue placeholder="Select channel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="home">Home</SelectItem>
-                <SelectItem value="tech">Tech</SelectItem>
-                <SelectItem value="ops">Ops</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button type="submit" disabled={submitting} className="md:mb-0.5">
-            <Send className="size-4" />
-            Post
-          </Button>
-
-          <div className="space-y-2 md:col-span-3">
-            <Label htmlFor="content">Content</Label>
-            <Textarea
-              id="content"
-              placeholder="What is happening?"
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              maxLength={500}
-              rows={3}
-            />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{error ?? "Posts refresh all columns after publishing."}</span>
-              <span>{content.length}/500</span>
+        {account === null ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background p-4 shadow-sm">
+            <div>
+              <p className="text-sm font-medium">Sign in to join the conversation</p>
+              <p className="text-xs text-muted-foreground">
+                Your verified profile supplies the author identity.
+              </p>
             </div>
+            <Button type="button" variant="outline" onClick={onAuthRequest}>
+              Sign in or register
+            </Button>
           </div>
-        </form>
+        ) : (
+          <form
+            className="grid gap-4 rounded-2xl border border-border/70 bg-background p-4 shadow-sm md:grid-cols-[1fr_auto] md:items-end"
+            onSubmit={handleSubmit}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="channel">Channel</Label>
+              <Select
+                value={channel}
+                onValueChange={(value) => setChannel(value as Channel)}
+              >
+                <SelectTrigger id="channel">
+                  <SelectValue placeholder="Select channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="home">Home</SelectItem>
+                  <SelectItem value="tech">Tech</SelectItem>
+                  <SelectItem value="ops">Ops</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button type="submit" disabled={submitting} className="md:mb-0.5">
+              <Send className="size-4" />
+              {submitting ? "Posting..." : "Post"}
+            </Button>
+
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="content">Content</Label>
+                <span className="text-xs text-muted-foreground">
+                  Posting as {account.displayName} (@{account.handle})
+                </span>
+              </div>
+              <Textarea
+                id="content"
+                placeholder="What is happening?"
+                value={content}
+                onChange={(event) => setContent(event.target.value)}
+                maxLength={500}
+                rows={3}
+              />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{error ?? "Posts refresh all columns after publishing."}</span>
+                <span>{content.length}/500</span>
+              </div>
+            </div>
+          </form>
+        )}
       </div>
     </section>
   )
