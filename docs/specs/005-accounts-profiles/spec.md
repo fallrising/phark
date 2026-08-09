@@ -1,6 +1,6 @@
 # 005：帳號與個人資料
 
-> 狀態：In progress
+> 狀態：Complete
 > 日期：2026-07-30
 
 ## 問題
@@ -244,7 +244,7 @@ And 其他 account 無法透過 API 修改 alice。
 - [x] Client 無法指定 ownership；legacy authors 不被新 account 認領。
 - [x] Profile read/update 與 author posts cursor pagination 通過。
 - [x] Frontend 完成 register/login/logout、authorship 與 profile flows。
-- [ ] Backend、frontend、Docker/runtime smoke 與 GitHub Actions 全綠。
+- [x] Backend、frontend、Docker/runtime smoke 與 GitHub Actions 全綠。
 
 ## 參考
 

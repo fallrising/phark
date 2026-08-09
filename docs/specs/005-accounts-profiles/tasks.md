@@ -88,7 +88,7 @@
   - [x] F.2.1 Docker multi-stage build 與 clean V4 migration。
   - [x] F.2.2 Runtime register/login/rotation/authenticated authorship smoke。
   - [x] F.2.3 Runtime profile/logout/anonymous/CSRF failure smoke。
-- [ ] **F.3 CI 與交付**
-  - [ ] F.3.1 推送所有階段 commits 並維護 draft PR。
-  - [ ] F.3.2 GitHub Actions final head 全綠。
-  - [ ] F.3.3 固化 verification evidence 並完成 SDD-005。
+- [x] **F.3 CI 與交付**
+  - [x] F.3.1 推送所有階段 commits 並維護 draft PR。
+  - [x] F.3.2 GitHub Actions final head 全綠。
+  - [x] F.3.3 固化 verification evidence 並完成 SDD-005。

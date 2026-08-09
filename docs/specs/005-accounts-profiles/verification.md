@@ -63,6 +63,10 @@ logout=204 post_logout_write=401 spa_fallback=200
 
 ## GitHub Actions
 
-Final-head CI evidence will be added after this delivery checkpoint is pushed. The required
-job is `.github/workflows/ci.yml` → `Build container image`, which runs the same multi-stage
-Docker build on a clean GitHub runner.
+- Delivery commit：`a6d37a6aba115cd1377eb3e03b169768ec817e7f`
+- Workflow run：[CI #5](https://github.com/fallrising/phark/actions/runs/31324841535)
+- Job：[Build container image](https://github.com/fallrising/phark/actions/runs/31324841535/job/93273449054)
+- 結果：successful，3m55s；0 failing、0 skipped
+
+此 job 從乾淨的 GitHub runner 執行 production multi-stage Docker build，涵蓋
+frontend lint/build、完整 backend suite、package 與 runtime image assembly。

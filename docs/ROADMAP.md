@@ -27,7 +27,7 @@
 
 ## P1：社交核心
 
-- [~] **SDD-005 — Accounts and profiles**（likes/reposts 的前置依賴）
+- [x] **SDD-005 — Accounts and profiles**（likes/reposts 的前置依賴）
   - [x] handle、display name、bio
   - [x] session authentication 與 CSRF
   - [x] author ownership、legacy compatibility 與 profile page
