@@ -92,6 +92,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout", "/api/posts",
                                 "/api/posts/*/replies")
                         .authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/posts/*/like").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/posts/*/like").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/profiles/me").authenticated()
                         .anyRequest().permitAll())
                 .logout(logout -> logout

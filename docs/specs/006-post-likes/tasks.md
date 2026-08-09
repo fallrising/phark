@@ -50,18 +50,18 @@
 
 ## D：Authenticated like API
 
-- [ ] **D.1 RED — Mutation contract**
-  - [ ] D.1.1 測試 like/unlike lifecycle、重送與 authoritative response。
-  - [ ] D.1.2 測試 invalid/missing post、self-like 與 legacy post。
-  - [ ] D.1.3 測試 anonymous/CSRF 拒絕且 database 無副作用。
-- [ ] **D.2 GREEN — API/service wiring**
-  - [ ] D.2.1 實作 LikeState、transactional service 與 controller。
-  - [ ] D.2.2 明確保護 PUT/DELETE route 並只信任 principal actor。
-  - [ ] D.2.3 對齊 existing validation、Problem Details 與 request ID。
-- [ ] **D.3 GREEN/REFACTOR — Mutation regressions**
-  - [ ] D.3.1 驗證兩 actor interleaving 不覆蓋彼此 relation。
-  - [ ] D.3.2 驗證 mutation 不改 post timestamp/cursor membership。
-  - [ ] D.3.3 執行 focused security/API 與完整 backend suite。
+- [x] **D.1 RED — Mutation contract**
+  - [x] D.1.1 測試 like/unlike lifecycle、重送與 authoritative response。
+  - [x] D.1.2 測試 invalid/missing post、self-like 與 legacy post。
+  - [x] D.1.3 測試 anonymous/CSRF 拒絕且 database 無副作用。
+- [x] **D.2 GREEN — API/service wiring**
+  - [x] D.2.1 實作 LikeState、transactional service 與 controller。
+  - [x] D.2.2 明確保護 PUT/DELETE route 並只信任 principal actor。
+  - [x] D.2.3 對齊 existing validation、Problem Details 與 request ID。
+- [x] **D.3 GREEN/REFACTOR — Mutation regressions**
+  - [x] D.3.1 驗證兩 actor interleaving 不覆蓋彼此 relation。
+  - [x] D.3.2 驗證 mutation 不改 post timestamp/cursor membership。
+  - [x] D.3.3 執行 focused security/API 與完整 backend suite。
 
 ## E：Frontend optimistic experience
 

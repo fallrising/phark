@@ -9,8 +9,8 @@
 |--------|------|
 | `1eb20d3` | Spec、design、風險與 54 項孫任務 |
 | `1530d45` | V5 migration、composite uniqueness 與 like persistence |
-| This checkpoint | Viewer-aware timeline/profile reads 與 private cache policy |
-| Pending | Authenticated idempotent like API |
+| `7bac5ea` | Viewer-aware timeline/profile reads 與 private cache policy |
+| This checkpoint | Authenticated idempotent PUT/DELETE like API |
 | Pending | Frontend optimistic interaction |
 
 ## Required gates
@@ -18,8 +18,8 @@
 | Gate | 狀態 | 證據 |
 |------|------|------|
 | Focused migration/repository tests | 通過 | 8 tests；0 failures、0 errors、0 skipped |
-| Focused read/API/security tests | 部分通過 | Read contract + nearby regressions 48 tests 通過；mutation API pending |
-| Complete backend regression | 通過（read checkpoint） | 154 tests；0 failures、0 errors、0 skipped |
+| Focused read/API/security tests | 通過 | 31 tests；0 failures、0 errors、0 skipped |
+| Complete backend regression | 通過（mutation checkpoint） | 164 tests；0 failures、0 errors、0 skipped |
 | Frontend lint | Pending | — |
 | Frontend production build | Pending | — |
 | Multi-stage Docker build | Pending | — |
@@ -50,3 +50,14 @@
 - Regression：`mvn -f backend/pom.xml -B test` → 154 tests 通過。
 - Anonymous、liker、non-liker、profile 與 legacy post 都由真實 SQLite relation 驗證；
   timeline/profile response 皆包含 `Cache-Control: private, no-store`。
+
+## Mutation API checkpoint evidence
+
+- RED：`PostLikeMutationContractTest` 10 tests 中 9 個因 route 缺失而預期失敗；
+  missing-CSRF scenario 已由既有 security filter 通過。
+- GREEN focused：
+  `mvn -f backend/pom.xml -B -Dtest=PostLikeMutationContractTest,PostLikeReadContractTest,PostLikeRepositoryTest,AuthSecurityContractTest test`
+  → 31 tests 通過。
+- Regression：`mvn -f backend/pom.xml -B test` → 164 tests 通過。
+- Contract 覆蓋 PUT/DELETE 重送、兩 actor、invalid/missing/self/legacy post、actor spoof、
+  anonymous/CSRF 無副作用，以及 post timestamp/timeline membership 不變。
