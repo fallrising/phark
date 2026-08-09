@@ -26,19 +26,38 @@ public class PostService {
     }
 
     public PostPage getPosts(String channel, int limit, String before) {
+        return getPosts(channel, limit, before, null);
+    }
+
+    public PostPage getPosts(
+            String channel,
+            int limit,
+            String before,
+            Long viewerAccountId) {
         validateChannel(channel);
         validateLimit(limit);
 
         PostCursor beforeCursor = decodeCursor(before);
-        return toPage(postRepository.findPage(channel, limit + 1, beforeCursor), limit);
+        return toPage(
+                postRepository.findPage(channel, limit + 1, beforeCursor, viewerAccountId),
+                limit);
     }
 
     public PostPage getPostsByAccountId(long accountId, int limit, String before) {
+        return getPostsByAccountId(accountId, limit, before, null);
+    }
+
+    public PostPage getPostsByAccountId(
+            long accountId,
+            int limit,
+            String before,
+            Long viewerAccountId) {
         validateLimit(limit);
 
         PostCursor beforeCursor = decodeCursor(before);
         return toPage(
-                postRepository.findPageByAccountId(accountId, limit + 1, beforeCursor),
+                postRepository.findPageByAccountId(
+                        accountId, limit + 1, beforeCursor, viewerAccountId),
                 limit);
     }
 

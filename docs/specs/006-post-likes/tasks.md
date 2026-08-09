@@ -35,18 +35,18 @@
 
 ## C：Viewer-aware post reads
 
-- [ ] **C.1 RED — Read contract**
-  - [ ] C.1.1 測試 anonymous timeline count 正確且 viewer state false。
-  - [ ] C.1.2 測試 liker/non-liker session 得到各自 viewer state。
-  - [ ] C.1.3 測試 profile timeline、legacy post 與 cache headers。
-- [ ] **C.2 GREEN — Query/model wiring**
-  - [ ] C.2.1 擴充 Post model 與 row mapping 的 non-null like fields。
-  - [ ] C.2.2 以 bounded query 計算 count 與 authenticated EXISTS。
-  - [ ] C.2.3 從 timeline/profile controller 傳遞 optional viewer ID。
-- [ ] **C.3 GREEN/REFACTOR — Read regressions**
-  - [ ] C.3.1 保持 channel/profile cursor page ordering 與 bounds。
-  - [ ] C.3.2 保持 replyCount、author snapshot 與 ownership behavior。
-  - [ ] C.3.3 執行 focused controller/repository 與完整 backend suite。
+- [x] **C.1 RED — Read contract**
+  - [x] C.1.1 測試 anonymous timeline count 正確且 viewer state false。
+  - [x] C.1.2 測試 liker/non-liker session 得到各自 viewer state。
+  - [x] C.1.3 測試 profile timeline、legacy post 與 cache headers。
+- [x] **C.2 GREEN — Query/model wiring**
+  - [x] C.2.1 擴充 Post model 與 row mapping 的 non-null like fields。
+  - [x] C.2.2 以 bounded query 計算 count 與 authenticated EXISTS。
+  - [x] C.2.3 從 timeline/profile controller 傳遞 optional viewer ID。
+- [x] **C.3 GREEN/REFACTOR — Read regressions**
+  - [x] C.3.1 保持 channel/profile cursor page ordering 與 bounds。
+  - [x] C.3.2 保持 replyCount、author snapshot 與 ownership behavior。
+  - [x] C.3.3 執行 focused controller/repository 與完整 backend suite。
 
 ## D：Authenticated like API
 
