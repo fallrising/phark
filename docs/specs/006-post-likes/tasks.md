@@ -20,18 +20,18 @@
 
 ## B：V5 persistence
 
-- [ ] **B.1 RED — Migration contract**
-  - [ ] B.1.1 測試 empty database 建立 post_likes、composite PK 與 foreign keys。
-  - [ ] B.1.2 測試 V4/V3 upgrade 保留 accounts/posts/replies 與 IDs。
-  - [ ] B.1.3 測試 legacy baseline upgrade 到 V5 且既有內容未被 like。
-- [ ] **B.2 GREEN — Schema 與 repository**
-  - [ ] B.2.1 新增 immutable `V5__add_post_likes.sql`。
-  - [ ] B.2.2 實作 conflict-safe like 與精確 unlike operations。
-  - [ ] B.2.3 實作 authoritative count/viewer state query。
-- [ ] **B.3 GREEN/REFACTOR — Persistence behavior**
-  - [ ] B.3.1 驗證同 actor 重送 like/unlike 都冪等。
-  - [ ] B.3.2 驗證兩 actor 各自 state 與共享 count。
-  - [ ] B.3.3 執行 focused migration/repository 與附近 regression tests。
+- [x] **B.1 RED — Migration contract**
+  - [x] B.1.1 測試 empty database 建立 post_likes、composite PK 與 foreign keys。
+  - [x] B.1.2 測試 V4/V3 upgrade 保留 accounts/posts/replies 與 IDs。
+  - [x] B.1.3 測試 legacy baseline upgrade 到 V5 且既有內容未被 like。
+- [x] **B.2 GREEN — Schema 與 repository**
+  - [x] B.2.1 新增 immutable `V5__add_post_likes.sql`。
+  - [x] B.2.2 實作 conflict-safe like 與精確 unlike operations。
+  - [x] B.2.3 實作 authoritative count/viewer state query。
+- [x] **B.3 GREEN/REFACTOR — Persistence behavior**
+  - [x] B.3.1 驗證同 actor 重送 like/unlike 都冪等。
+  - [x] B.3.2 驗證兩 actor 各自 state 與共享 count。
+  - [x] B.3.3 執行 focused migration/repository 與附近 regression tests。
 
 ## C：Viewer-aware post reads
 
