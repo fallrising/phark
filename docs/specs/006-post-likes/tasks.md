@@ -65,18 +65,18 @@
 
 ## E：Frontend optimistic experience
 
-- [ ] **E.1 Typed API 與 pure state helpers**
-  - [ ] E.1.1 擴充 Post/LikeState type 與 PUT/DELETE client functions。
-  - [ ] E.1.2 實作 optimistic、server reconcile 與 snapshot rollback helpers。
-  - [ ] E.1.3 驗證 count floor、functional update 與 viewer-dependent reload。
-- [ ] **E.2 Like interaction**
-  - [ ] E.2.1 PostCard 顯示 count/state 並提供可存取的 toggle button。
-  - [ ] E.2.2 以 per-post pending guard 防止 rapid/out-of-order mutations。
-  - [ ] E.2.3 Anonymous/security-not-ready 不送 request 並顯示 actionable feedback。
-- [ ] **E.3 Cross-view synchronization 與 gate**
-  - [ ] E.3.1 App 同步更新所有 feed copies 並以 server state 對齊。
-  - [ ] E.3.2 ProfileView 使用相同 helper 並在 failure 復原。
-  - [ ] E.3.3 執行 frontend lint、TypeScript 與 production build。
+- [x] **E.1 Typed API 與 pure state helpers**
+  - [x] E.1.1 擴充 Post/LikeState type 與 PUT/DELETE client functions。
+  - [x] E.1.2 實作 optimistic、server reconcile 與 snapshot rollback helpers。
+  - [x] E.1.3 驗證 count floor、functional update 與 viewer-dependent reload。
+- [x] **E.2 Like interaction**
+  - [x] E.2.1 PostCard 顯示 count/state 並提供可存取的 toggle button。
+  - [x] E.2.2 以 per-post pending guard 防止 rapid/out-of-order mutations。
+  - [x] E.2.3 Anonymous/security-not-ready 不送 request 並顯示 actionable feedback。
+- [x] **E.3 Cross-view synchronization 與 gate**
+  - [x] E.3.1 App 同步更新所有 feed copies 並以 server state 對齊。
+  - [x] E.3.2 ProfileView 使用相同 helper 並在 failure 復原。
+  - [x] E.3.3 執行 frontend lint、TypeScript 與 production build。
 
 ## F：文件與整合交付
 

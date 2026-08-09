@@ -8,6 +8,14 @@ export interface Post {
   channel: Channel
   createdAt: string
   replyCount: number
+  likeCount: number
+  likedByViewer: boolean
+}
+
+export interface LikeState {
+  postId: number
+  likeCount: number
+  likedByViewer: boolean
 }
 
 export interface Reply {

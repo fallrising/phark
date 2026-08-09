@@ -8,16 +8,23 @@ import {
   type AccountProfile,
 } from "@/api/accounts"
 import { getApiErrorMessage } from "@/api/client"
+import { likePost, unlikePost } from "@/api/posts"
 import { PostCard } from "@/components/PostCard"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  applyLikeStateToPosts,
+  optimisticLikeState,
+  snapshotLikeState,
+} from "@/lib/postLikes"
 import type { Post } from "@/types/post"
 
 interface ProfileViewProps {
   handle: string
   sessionAccount: AccountProfile | null
+  securityReady: boolean | null
   onBack: () => void
   onAuthRequest: () => void
   onNavigateProfile: (handle: string) => void
@@ -33,6 +40,7 @@ function formatJoined(value: string): string {
 export function ProfileView({
   handle,
   sessionAccount,
+  securityReady,
   onBack,
   onAuthRequest,
   onNavigateProfile,
@@ -48,9 +56,14 @@ export function ProfileView({
   const [displayName, setDisplayName] = useState("")
   const [bio, setBio] = useState("")
   const [saving, setSaving] = useState(false)
+  const [pendingLikeIds, setPendingLikeIds] = useState<Set<number>>(new Set())
+  const [likeErrors, setLikeErrors] = useState<Record<number, string>>({})
   const requestVersion = useRef(0)
+  const likeMutations = useRef(new Set<number>())
 
   const loadProfile = useCallback(async () => {
+    if (securityReady === null) return
+
     const version = ++requestVersion.current
     setLoading(true)
     setError(null)
@@ -80,7 +93,7 @@ export function ProfileView({
         setLoading(false)
       }
     }
-  }, [handle])
+  }, [handle, securityReady])
 
   useEffect(() => {
     void loadProfile()
@@ -160,6 +173,67 @@ export function ProfileView({
           : post
       )
     )
+  }
+
+  async function handleToggleLike(post: Post) {
+    if (sessionAccount === null) {
+      setLikeErrors((current) => ({
+        ...current,
+        [post.id]: "Sign in to like this post.",
+      }))
+      onAuthRequest()
+      return
+    }
+    if (securityReady !== true) {
+      setLikeErrors((current) => ({
+        ...current,
+        [post.id]:
+          securityReady === null
+            ? "Secure actions are still initializing."
+            : "Secure actions are unavailable. Retry account security setup.",
+      }))
+      return
+    }
+    if (likeMutations.current.has(post.id)) return
+
+    const snapshot = snapshotLikeState(post)
+    const optimistic = optimisticLikeState(snapshot)
+    const version = requestVersion.current
+    likeMutations.current.add(post.id)
+    setPendingLikeIds((current) => new Set(current).add(post.id))
+    setLikeErrors((current) => {
+      const next = { ...current }
+      delete next[post.id]
+      return next
+    })
+    setPosts((current) => applyLikeStateToPosts(current, optimistic))
+
+    try {
+      const state = snapshot.likedByViewer
+        ? await unlikePost(post.id)
+        : await likePost(post.id)
+      if (version === requestVersion.current) {
+        setPosts((current) => applyLikeStateToPosts(current, state))
+      }
+    } catch (error) {
+      if (version === requestVersion.current) {
+        setPosts((current) => applyLikeStateToPosts(current, snapshot))
+        setLikeErrors((current) => ({
+          ...current,
+          [post.id]: getApiErrorMessage(
+            error,
+            "Unable to update this like. Please try again."
+          ),
+        }))
+      }
+    } finally {
+      likeMutations.current.delete(post.id)
+      setPendingLikeIds((current) => {
+        const next = new Set(current)
+        next.delete(post.id)
+        return next
+      })
+    }
   }
 
   if (loading) {
@@ -277,9 +351,12 @@ export function ProfileView({
                 key={post.id}
                 post={post}
                 sessionAccount={sessionAccount}
+                likePending={pendingLikeIds.has(post.id)}
+                likeError={likeErrors[post.id] ?? null}
                 onAuthRequest={onAuthRequest}
                 onNavigateProfile={onNavigateProfile}
                 onReplyCreated={handleReplyCreated}
+                onToggleLike={handleToggleLike}
               />
             ))}
           </div>

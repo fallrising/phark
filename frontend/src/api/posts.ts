@@ -3,6 +3,7 @@ import type {
   Channel,
   CreatePostRequest,
   CreateReplyRequest,
+  LikeState,
   Post,
   PostPage,
   Reply,
@@ -60,5 +61,17 @@ export function createPost(request: CreatePostRequest): Promise<Post> {
   return apiRequest<Post>("/api/posts", {
     method: "POST",
     body: request,
+  })
+}
+
+export function likePost(postId: number): Promise<LikeState> {
+  return apiRequest<LikeState>(`/api/posts/${postId}/like`, {
+    method: "PUT",
+  })
+}
+
+export function unlikePost(postId: number): Promise<LikeState> {
+  return apiRequest<LikeState>(`/api/posts/${postId}/like`, {
+    method: "DELETE",
   })
 }

@@ -10,8 +10,8 @@
 | `1eb20d3` | Spec、design、風險與 54 項孫任務 |
 | `1530d45` | V5 migration、composite uniqueness 與 like persistence |
 | `7bac5ea` | Viewer-aware timeline/profile reads 與 private cache policy |
-| This checkpoint | Authenticated idempotent PUT/DELETE like API |
-| Pending | Frontend optimistic interaction |
+| `e8f3abb` | Authenticated idempotent PUT/DELETE like API |
+| This checkpoint | Frontend optimistic interaction、reconcile 與 rollback |
 
 ## Required gates
 
@@ -20,8 +20,8 @@
 | Focused migration/repository tests | 通過 | 8 tests；0 failures、0 errors、0 skipped |
 | Focused read/API/security tests | 通過 | 31 tests；0 failures、0 errors、0 skipped |
 | Complete backend regression | 通過（mutation checkpoint） | 164 tests；0 failures、0 errors、0 skipped |
-| Frontend lint | Pending | — |
-| Frontend production build | Pending | — |
+| Frontend lint | 通過 | oxlint；0 warnings、0 errors、22 files |
+| Frontend production build | 通過 | TypeScript project build + Vite；1861 modules |
 | Multi-stage Docker build | Pending | — |
 | Production-like runtime smoke | Pending | — |
 | GitHub Actions final head | Pending | — |
@@ -61,3 +61,15 @@
 - Regression：`mvn -f backend/pom.xml -B test` → 164 tests 通過。
 - Contract 覆蓋 PUT/DELETE 重送、兩 actor、invalid/missing/self/legacy post、actor spoof、
   anonymous/CSRF 無副作用，以及 post timestamp/timeline membership 不變。
+
+## Frontend checkpoint evidence
+
+- `Post`/`LikeState` typed contract 與 PUT/DELETE client 通過 TypeScript compilation。
+- Pure helpers 只保存/覆寫 like fields；rollback 不會覆蓋 concurrent replyCount 或其他 post data。
+- App 以 post ID functional update 三個 feeds；ProfileView 使用同一 helper；兩者都有
+  per-post in-flight guard、server reconciliation、failure snapshot rollback 與 stale-load guard。
+- Direct profile load 等 identity/CSRF initialization 完成後才抓 viewer-aware posts，避免把
+  authenticated viewer 誤當 anonymous。
+- Production frontend target：`docker build --target frontend-build -t phark-sdd006-frontend-final .`
+  → lint 0 warnings/errors；TypeScript/Vite build 通過；image
+  `sha256:dd6e85445a9f28cdec75430685a510c123d595b820398d3c15054f3448f18ab0`。
