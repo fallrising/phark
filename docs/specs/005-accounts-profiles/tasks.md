@@ -80,14 +80,14 @@
 
 ## F：文件與整合交付
 
-- [ ] **F.1 開發/營運文件**
-  - [ ] F.1.1 記錄 auth/profile API、CSRF client sequence 與 error codes。
-  - [ ] F.1.2 記錄 session timeout、cookie Secure 與 restart logout 限制。
-  - [ ] F.1.3 更新 architecture、migration runbook、roadmap 與 SDD evidence。
-- [ ] **F.2 Production-like validation**
-  - [ ] F.2.1 Docker multi-stage build 與 clean V4 migration。
-  - [ ] F.2.2 Runtime register/login/rotation/authenticated authorship smoke。
-  - [ ] F.2.3 Runtime profile/logout/anonymous/CSRF failure smoke。
+- [x] **F.1 開發/營運文件**
+  - [x] F.1.1 記錄 auth/profile API、CSRF client sequence 與 error codes。
+  - [x] F.1.2 記錄 session timeout、cookie Secure 與 restart logout 限制。
+  - [x] F.1.3 更新 architecture、migration runbook、roadmap 與 SDD evidence。
+- [x] **F.2 Production-like validation**
+  - [x] F.2.1 Docker multi-stage build 與 clean V4 migration。
+  - [x] F.2.2 Runtime register/login/rotation/authenticated authorship smoke。
+  - [x] F.2.3 Runtime profile/logout/anonymous/CSRF failure smoke。
 - [ ] **F.3 CI 與交付**
   - [ ] F.3.1 推送所有階段 commits 並維護 draft PR。
   - [ ] F.3.2 GitHub Actions final head 全綠。

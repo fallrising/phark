@@ -237,13 +237,13 @@ And 其他 account 無法透過 API 修改 alice。
 
 ## 驗收條件
 
-- [ ] V4 migration 對 empty、V3、legacy baseline database 都保留資料並通過。
-- [ ] Password hash、generic login failure、session fixation 與 logout 有 tests。
-- [ ] 所有 unsafe endpoints 實際需要 CSRF；401/403 遵循 Problem Details。
-- [ ] Anonymous read 保持可用；post/reply write 必須 authenticated。
-- [ ] Client 無法指定 ownership；legacy authors 不被新 account 認領。
-- [ ] Profile read/update 與 author posts cursor pagination 通過。
-- [ ] Frontend 完成 register/login/logout、authorship 與 profile flows。
+- [x] V4 migration 對 empty、V3、legacy baseline database 都保留資料並通過。
+- [x] Password hash、generic login failure、session fixation 與 logout 有 tests。
+- [x] 所有 unsafe endpoints 實際需要 CSRF；401/403 遵循 Problem Details。
+- [x] Anonymous read 保持可用；post/reply write 必須 authenticated。
+- [x] Client 無法指定 ownership；legacy authors 不被新 account 認領。
+- [x] Profile read/update 與 author posts cursor pagination 通過。
+- [x] Frontend 完成 register/login/logout、authorship 與 profile flows。
 - [ ] Backend、frontend、Docker/runtime smoke 與 GitHub Actions 全綠。
 
 ## 參考

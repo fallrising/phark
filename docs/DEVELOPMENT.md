@@ -12,26 +12,29 @@ phark/
 │       ├── main/
 │       │   ├── java/com/example/deck/
 │       │   │   ├── DeckApplication.java
-│       │   │   ├── config/       # DatabaseConfig, SchemaMigrationConfig, WebConfig
-│       │   │   ├── controller/   # PostController, ReplyController
-│       │   │   ├── dto/          # CreatePostRequest, CreateReplyRequest
+│       │   │   ├── config/       # Database, migration, security 與 SPA config
+│       │   │   ├── controller/   # Auth、account、profile、post、reply APIs
+│       │   │   ├── dto/          # JSON request/response boundaries
 │       │   │   ├── error/        # RFC 9457 codes、exception mapper、violations
-│       │   │   ├── model/        # Post, Reply 與 page contracts
-│       │   │   ├── repository/   # PostRepository, ReplyRepository (JdbcClient)
-│       │   │   ├── service/      # PostService, ReplyService
+│       │   │   ├── model/        # Account、profile、content 與 page contracts
+│       │   │   ├── repository/   # Account/Post/Reply JdbcClient repositories
+│       │   │   ├── security/     # Principal、UserDetails 與 Problem writers
+│       │   │   ├── service/      # Account、Post、Reply services
 │       │   │   └── web/          # Request correlation filter
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       ├── application-prod.properties
-│       │       └── db/migration/  # Flyway V1、V2、V3...
+│       │       └── db/migration/  # Immutable Flyway V1...V4
 │       └── test/
 ├── frontend/                # React + TypeScript + Vite + shadcn/ui
 │   ├── package.json
 │   ├── package-lock.json    # 必須提交
 │   ├── components.json      # shadcn/ui 設定
 │   └── src/
-│       ├── api/posts.ts     # 同源 API 呼叫（/api/posts）
-│       ├── components/      # Composer, Column, PostCard, ui/*
+│       ├── api/client.ts    # Problem Details、same-origin fetch、CSRF memory
+│       ├── api/accounts.ts  # Account/session/profile typed calls
+│       ├── api/posts.ts     # Post/reply typed calls
+│       ├── components/      # Auth、profile、timeline、composer、ui/*
 │       └── types/post.ts
 ├── Dockerfile               # multi-stage build
 ├── .dockerignore
@@ -48,9 +51,11 @@ phark/
 | 頁面名稱 | Stream Deck |
 | 三欄版面 | Home、Tech、Ops（桌面並排，手機橫向捲動） |
 | Post cards | 每欄顯示文章卡片 |
-| Composer | 上方輸入 author、content、channel |
+| Composer | 登入後以 session identity 輸入 content、channel |
 | 游標分頁 | 每欄先載入 20 筆，可獨立載入更舊文章 |
 | 對話串 | 每篇文章可正序讀取及建立單層回覆 |
+| 帳號 | Register、login、logout 與 30 分鐘 server-side session |
+| Profile | 公開 profile、作者文章分頁與 owner display name/bio 編輯 |
 | 自動刷新 | 發文後三欄自動重新載入 |
 
 ## REST API
@@ -76,6 +81,7 @@ GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
     {
       "id": 1,
       "author": "Alice",
+      "authorHandle": "alice_ops",
       "content": "Hello",
       "channel": "home",
       "createdAt": "2026-07-13T10:00:00Z",
@@ -91,11 +97,11 @@ channel、limit 或 cursor 回傳 `400 Bad Request`。
 
 ### `POST /api/posts`
 
-建立文章，回傳 `201 Created`。
+需 authenticated session 與有效 CSRF；作者只取自 session account。建立成功回傳
+`201 Created`。
 
 ```json
 {
-  "author": "Alice",
   "content": "Hello",
   "channel": "home"
 }
@@ -103,7 +109,6 @@ channel、limit 或 cursor 回傳 `400 Bad Request`。
 
 | 欄位 | 規則 |
 |------|------|
-| `author` | 不可空白，最多 80 字 |
 | `content` | 不可空白，最多 500 字 |
 | `channel` | 僅允許 `home`、`tech`、`ops`；無效回傳 `400` |
 
@@ -113,6 +118,7 @@ channel、limit 或 cursor 回傳 `400 Bad Request`。
 {
   "id": 1,
   "author": "Alice",
+  "authorHandle": "alice_ops",
   "content": "Hello",
   "channel": "home",
   "createdAt": "2026-07-13T10:00:00Z",
@@ -129,22 +135,69 @@ GET /api/posts/1/replies?limit=20&after=<opaque-cursor>
 ```
 
 回傳 `{ "items": [...], "nextCursor": "..." }`，其中每個 item 包含 `id`、
-`postId`、`author`、`content`、`createdAt`。`limit` 允許 `1..100`；不存在的
-parent post 回傳 `404`，無效 post id、limit 或 cursor 回傳 `400`。
+`postId`、`author`、nullable `authorHandle`、`content`、`createdAt`。`limit` 允許
+`1..100`；不存在的 parent post 回傳 `404`，無效 post id、limit 或 cursor 回傳
+`400`。
 
 ### `POST /api/posts/{postId}/replies`
 
-建立單層回覆，成功回傳 `201 Created` 與 Reply：
+需 authenticated session 與有效 CSRF；建立成功回傳 `201 Created` 與 Reply：
 
 ```json
 {
-  "author": "Bob",
   "content": "Agreed."
 }
 ```
 
-author 與 content 的 validation 規則和文章相同。`replyCount` 由後端計算，
-建立成功後再次讀取 timeline 即會增加。
+作者由 session 決定，content validation 規則和文章相同。`replyCount` 由後端
+計算，建立成功後再次讀取 timeline 即會增加。Account-owned content 的 `author`
+使用目前 display name，`authorHandle` 是 canonical handle；V1–V3 legacy content
+保留既有 author snapshot 且 `authorHandle=null`。
+
+### 帳號、Session 與 CSRF
+
+| Method | Path | Auth | 說明 |
+|--------|------|------|------|
+| GET | `/api/auth/csrf` | Public | 回傳 `headerName` 與 opaque token；`no-store` |
+| POST | `/api/accounts` | Public + CSRF | 註冊；成功 201，不自動登入 |
+| POST | `/api/auth/login` | Public + CSRF | JSON credentials；成功旋轉 session ID |
+| GET | `/api/auth/session` | Public | 回傳 `{ "account": profile-or-null }` |
+| POST | `/api/auth/logout` | Session + CSRF | 清除 context、session 與 cookie；成功 204 |
+| GET | `/api/profiles/{handle}` | Public | 公開 profile |
+| PATCH | `/api/profiles/me` | Session + CSRF | 修改自己的 display name 與 bio |
+| GET | `/api/profiles/{handle}/posts` | Public | 作者文章 keyset page |
+
+Handle canonicalize 為 lowercase，必須是 3–15 個 ASCII `a-z`、`0-9`、`_`。
+Display name 為 1–50 characters，bio 最多 160 characters，password 為 12–72
+UTF-8 bytes。Password 只保存 delegating BCrypt hash，永不出現在 response 或 log。
+
+同源 client 的必要順序：
+
+1. 啟動時呼叫 `GET /api/auth/csrf`，token 只保存在記憶體。
+2. 同時呼叫 `GET /api/auth/session`，建立目前 identity state。
+3. 所有 `POST`、`PATCH`、`DELETE` 都使用 response 指定的 header name/token。
+4. Login/logout 完成後丟棄舊 token，等待新的 `/api/auth/csrf` response 才允許
+   下一個 mutation。
+5. `CSRF_TOKEN_INVALID` 不自動重試 mutation；顯示安全錯誤並重新載入 token/page。
+
+以下 shell sequence 示範 registration；`csrf.json` 與 cookie jar 都是敏感的本機
+暫存檔，不可提交或記錄 token 值：
+
+```bash
+BASE_URL=http://127.0.0.1:8080
+curl -fsS -c cookies.txt -o csrf.json "$BASE_URL/api/auth/csrf"
+
+# 從 csrf.json 讀取 headerName/token，並在同一 cookie jar 的 POST 中帶入：
+curl -fsS -b cookies.txt -c cookies.txt \
+  -X POST "$BASE_URL/api/accounts" \
+  -H 'Content-Type: application/json' \
+  -H '<headerName>: <token>' \
+  -d '{"handle":"alice_ops","displayName":"Alice","password":"correct horse battery staple"}'
+```
+
+登入 request 使用 `{ "handle": "alice_ops", "password": "..." }`。Profile update
+request 使用 `{ "displayName": "Alice Ops", "bio": "..." }`。Frontend
+`api/client.ts` 已實作相同的 fail-closed sequence，且不使用 local/session storage。
 
 ### API 錯誤契約
 
@@ -181,9 +234,15 @@ members 必須忽略。
 | `INVALID_CURSOR` | 400 | timeline/replies cursor 不合法 |
 | `INVALID_POST_ID` | 400 | post ID 不是正整數 |
 | `MALFORMED_REQUEST` | 400 | request body 缺失、語法錯誤或無法讀取 |
+| `INVALID_CREDENTIALS` | 401 | 登入失敗；不區分 handle 或 password 原因 |
+| `AUTHENTICATION_REQUIRED` | 401 | protected endpoint 缺少有效 session |
+| `CSRF_TOKEN_INVALID` | 403 | unsafe request 缺少或使用無效 token |
+| `ACCESS_DENIED` | 403 | authenticated account 沒有權限 |
+| `PROFILE_NOT_FOUND` | 404 | 指定 handle 不存在 |
 | `POST_NOT_FOUND` | 404 | 指定文章不存在 |
 | `RESOURCE_NOT_FOUND` | 404 | API route/resource 不存在 |
 | `METHOD_NOT_ALLOWED` | 405 | HTTP method 不支援 |
+| `HANDLE_UNAVAILABLE` | 409 | canonical handle 已被註冊 |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | request Content-Type 不支援 |
 | `INTERNAL_ERROR` | 500 | 未預期錯誤；不回傳內部 exception details |
 
@@ -210,6 +269,8 @@ Request ID 只用於關聯 response 與 server log，不是 authentication 或�
 | `APP_DB_PATH` | 本地為 `./data/deck.db`；prod 為 `/data/deck.db` | SQLite 檔案路徑 |
 | `SPRING_PROFILES_ACTIVE` | — | 設為 `prod` 啟用 production 設定 |
 | `SERVER_PORT` | `8080` | HTTP 埠（prod profile） |
+| `SESSION_COOKIE_SECURE` | 本地 `false`；prod `true` | HTTPS production 必須為 `true` |
+| `SERVER_SERVLET_SESSION_TIMEOUT` | `30m` | In-memory HTTP session idle timeout |
 
 ### SQLite 設定
 
@@ -225,8 +286,13 @@ Request ID 只用於關聯 response 與 server log，不是 authentication 或�
 - `server.port=8080`
 - `server.forward-headers-strategy=framework`（Traefik 代理必須）
 - `server.shutdown=graceful`
+- Session cookie 為 HttpOnly、SameSite=Lax、Secure；timeout 預設 30 分鐘
 - Actuator 僅 expose `health`、`info`
 - `/actuator/health` 供 Docker healthcheck 使用
+
+Session 只存在單一 application instance 的記憶體；container restart、重新部署或
+process crash 都會登出所有使用者。這是目前 replicas=1 邊界，不可把它解讀為
+persistent login。多 instance 前必須先引入共享 session store。
 
 ## 本地開發
 
@@ -281,6 +347,7 @@ docker run --rm \
   -p 8080:8080 \
   -e APP_DB_PATH=/data/deck.db \
   -e SPRING_PROFILES_ACTIVE=prod \
+  -e SESSION_COOKIE_SECURE=false \
   -v "$(pwd)/.local-data:/data" \
   deck:local
 ```
@@ -312,7 +379,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 | 範圍 | 命令 | 覆蓋 |
 |------|------|------|
-| Backend | `mvn -f backend/pom.xml test` | posts/replies、migration、cursor、Problem Details、correlation、validation |
+| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content、migration、errors |
 | Frontend lint | `npm run lint`（在 `frontend/`） | oxlint |
 | Frontend build | `npm run build`（在 `frontend/`） | TypeScript + Vite |
 | 整合 | `docker build -t stream-deck .` | 含 frontend lint/build + Maven test |

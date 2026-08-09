@@ -1,7 +1,7 @@
 # Schema Migration Production Runbook
 
 > 適用於 deck 應用（`deck` Compose project），基於 Flyway + SQLite。
-> 最後更新：2026-07-29
+> 最後更新：2026-07-30
 
 ---
 
@@ -164,6 +164,12 @@ Runtime image 刻意不安裝 `sqlite3`；history 一律使用 host CLI 查詢�
 所有 migration 的 `success` 欄位應為 `1`。若版本號與預期不符，表示
 baseline 或 migration 順序有落差。
 
+SDD-005 release 的預期 latest version 是 V4 `add accounts and ownership`。V4 新增
+`accounts`、nullable `posts.author_account_id`、nullable
+`replies.author_account_id` 與對應 indexes。升級 V3 或 legacy baseline 時不得依
+`author` 字串建立 account；所有既有 ownership 必須保持 `NULL`，既有 row、ID、
+timestamp 與 author snapshot 必須保留。
+
 ---
 
 ## 步驟 5：失敗處理
@@ -267,7 +273,7 @@ New image:    ghcr.io/fallrising/phark:sha-def456...
 Backup:       /opt/apps/deck/backups/deck-20260730T120000Z.db
 Integrity:    ok
 Container:    Up (healthy)
-Migration:    V1 ~ V3 success = 1
+Migration:    V1 ~ V4 success = 1
 Result:       SUCCESS / FAILED → restored to abc123...
 ```
 

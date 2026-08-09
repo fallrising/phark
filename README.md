@@ -1,4 +1,4 @@
-# Stream Deck
+# Phark Stream Deck
 
 單體 Stream Deck 風格 web 應用：Spring Boot 後端 + React 前端，同源部署於單一 Docker 映像。
 
@@ -15,12 +15,18 @@ docker build -t stream-deck .
 ### Docker run
 
 ```bash
-docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
+docker run --rm \
+  -p 8080:8080 \
+  -e SESSION_COOKIE_SECURE=false \
+  -v stream-deck-data:/data \
+  stream-deck
 ```
 
 開啟 http://localhost:8080
 
-> 使用 **Docker named volume** 掛載 `/data`。若 bind mount 本機目錄，需 `chown 10001:10001`（容器以 UID 10001 執行）。
+> 使用 **Docker named volume** 掛載 `/data`。若 bind mount 本機目錄，需
+> `chown 10001:10001`（容器以 UID 10001 執行）。上例只供本機 HTTP；HTTPS
+> production 必須保留 `SESSION_COOKIE_SECURE=true`。
 
 ### Health check
 
@@ -32,11 +38,19 @@ curl -fsS http://localhost:8080/actuator/health
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
+| GET | `/api/auth/csrf` | 取得 unsafe request 使用的 CSRF header/token |
+| POST | `/api/accounts` | 註冊帳號（需 CSRF，不會自動登入） |
+| POST | `/api/auth/login` | 建立 authenticated session（需 CSRF） |
+| GET | `/api/auth/session` | 取得目前登入帳號；anonymous 時為 `null` |
+| POST | `/api/auth/logout` | 清除 session（需登入與 CSRF） |
 | GET | `/api/posts` | 最新一頁文章（預設 20 筆） |
 | GET | `/api/posts?channel=home&limit=20&before=...` | 依 channel 與 cursor 分頁 |
-| POST | `/api/posts` | 建立文章 |
+| POST | `/api/posts` | 以 session identity 建立文章（需登入與 CSRF） |
 | GET | `/api/posts/{postId}/replies?limit=20&after=...` | 正序讀取回覆 |
-| POST | `/api/posts/{postId}/replies` | 建立單層回覆 |
+| POST | `/api/posts/{postId}/replies` | 以 session identity 建立單層回覆 |
+| GET | `/api/profiles/{handle}` | 公開 profile |
+| PATCH | `/api/profiles/me` | 修改自己的 display name/bio |
+| GET | `/api/profiles/{handle}/posts` | 該帳號的 cursor-paginated posts |
 
 `GET /api/posts` 回傳 `{ "items": [...], "nextCursor": "..." }`。將非空的
 `nextCursor` 作為下一次 request 的 `before`；`limit` 允許 `1..100`。
@@ -47,11 +61,11 @@ curl -fsS http://localhost:8080/actuator/health
 保留相同的 `requestId` 供除錯。完整 schema 與代碼見
 [開發指南的 API 錯誤契約](docs/DEVELOPMENT.md#api-錯誤契約)。
 
-```bash
-curl -fsS -X POST http://localhost:8080/api/posts \
-  -H 'Content-Type: application/json' \
-  -d '{"author":"Alice","content":"Hello","channel":"home"}'
-```
+建立文章與回覆的 JSON 不接受作者身份；後端只使用 authenticated session account。
+Browser client 啟動時先並行取得 CSRF token 與 session，所有 `POST`、`PATCH`、
+`DELETE` 都帶伺服器指定的 CSRF header，並在 login/logout 後重新取得 token。
+完整 request 範例見
+[開發指南的帳號、Session 與 CSRF](docs/DEVELOPMENT.md#帳號session-與-csrf)。
 
 ## 文檔
 
@@ -75,4 +89,5 @@ curl -fsS -X POST http://localhost:8080/api/posts \
 - [x] 應用程式與 Docker build
 - [x] 三欄時間線 cursor pagination
 - [x] 單層回覆與 inline conversation threads
+- [x] Session accounts、可信作者歸屬與公開 profiles
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）
