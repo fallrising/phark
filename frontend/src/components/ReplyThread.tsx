@@ -2,8 +2,9 @@ import { useRef, useState, type FormEvent } from "react"
 import { ChevronDown, ChevronUp, MessageCircle, Send } from "lucide-react"
 
 import { createReply, fetchReplies, getApiErrorMessage } from "@/api/posts"
+import type { AccountProfile } from "@/api/accounts"
+import { AuthorLink } from "@/components/AuthorLink"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Reply } from "@/types/post"
@@ -11,6 +12,9 @@ import type { Reply } from "@/types/post"
 interface ReplyThreadProps {
   postId: number
   replyCount: number
+  sessionAccount: AccountProfile | null
+  onAuthRequest: () => void
+  onNavigateProfile: (handle: string) => void
   onReplyCreated: (postId: number) => void
 }
 
@@ -33,6 +37,9 @@ function mergeReplies(current: Reply[], incoming: Reply[]): Reply[] {
 export function ReplyThread({
   postId,
   replyCount,
+  sessionAccount,
+  onAuthRequest,
+  onNavigateProfile,
   onReplyCreated,
 }: ReplyThreadProps) {
   const [expanded, setExpanded] = useState(false)
@@ -42,7 +49,6 @@ export function ReplyThread({
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [author, setAuthor] = useState("")
   const [content, setContent] = useState("")
   const [error, setError] = useState<string | null>(null)
   const loadingPage = useRef(false)
@@ -90,10 +96,13 @@ export function ReplyThread({
       return
     }
 
-    const trimmedAuthor = author.trim()
     const trimmedContent = content.trim()
-    if (!trimmedAuthor || !trimmedContent) {
-      setError("Author and reply are required.")
+    if (sessionAccount === null) {
+      setError("Sign in before publishing a reply.")
+      return
+    }
+    if (!trimmedContent) {
+      setError("Reply content is required.")
       return
     }
 
@@ -102,7 +111,6 @@ export function ReplyThread({
     setError(null)
     try {
       const reply = await createReply(postId, {
-        author: trimmedAuthor,
         content: trimmedContent,
       })
       setItems((current) => mergeReplies(current, [reply]))
@@ -152,7 +160,12 @@ export function ReplyThread({
                   className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2"
                 >
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-medium">{reply.author}</span>
+                    <AuthorLink
+                      author={reply.author}
+                      handle={reply.authorHandle}
+                      className="text-xs font-medium hover:text-primary hover:underline"
+                      onNavigateProfile={onNavigateProfile}
+                    />
                     <time
                       dateTime={reply.createdAt}
                       className="text-[0.65rem] text-muted-foreground"
@@ -181,43 +194,52 @@ export function ReplyThread({
             </Button>
           ) : null}
 
-          <form className="space-y-2" onSubmit={handleSubmit}>
-            <div className="space-y-1">
-              <Label htmlFor={`${threadId}-author`} className="text-xs">
-                Author
-              </Label>
-              <Input
-                id={`${threadId}-author`}
-                value={author}
-                maxLength={80}
-                placeholder="Your name"
-                onChange={(event) => setAuthor(event.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor={`${threadId}-content`} className="text-xs">
-                Reply
-              </Label>
-              <Textarea
-                id={`${threadId}-content`}
-                value={content}
-                maxLength={500}
-                rows={2}
-                className="min-h-16"
-                placeholder="Join the conversation"
-                onChange={(event) => setContent(event.target.value)}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[0.65rem] text-muted-foreground">
-                {content.length}/500
-              </span>
-              <Button type="submit" size="sm" disabled={submitting}>
-                <Send className="size-3.5" />
-                {submitting ? "Replying..." : "Reply"}
+          {sessionAccount === null ? (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">
+                Sign in to reply with a verified identity.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onAuthRequest}
+              >
+                Sign in
               </Button>
             </div>
-          </form>
+          ) : (
+            <form className="space-y-2" onSubmit={handleSubmit}>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor={`${threadId}-content`} className="text-xs">
+                    Reply
+                  </Label>
+                  <span className="text-[0.65rem] text-muted-foreground">
+                    As {sessionAccount.displayName} (@{sessionAccount.handle})
+                  </span>
+                </div>
+                <Textarea
+                  id={`${threadId}-content`}
+                  value={content}
+                  maxLength={500}
+                  rows={2}
+                  className="min-h-16"
+                  placeholder="Join the conversation"
+                  onChange={(event) => setContent(event.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[0.65rem] text-muted-foreground">
+                  {content.length}/500
+                </span>
+                <Button type="submit" size="sm" disabled={submitting}>
+                  <Send className="size-3.5" />
+                  {submitting ? "Replying..." : "Reply"}
+                </Button>
+              </div>
+            </form>
+          )}
 
           {error ? (
             <p role="alert" className="text-xs text-destructive">

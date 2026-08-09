@@ -98,25 +98,93 @@ class SchemaMigrationConfigTest {
         }
     }
 
+    private boolean columnExists(String table, String column) throws Exception {
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equals(rs.getString("name"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean columnIsNullable(String table, String column) throws Exception {
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equals(rs.getString("name"))) {
+                    return rs.getInt("notnull") == 0;
+                }
+            }
+        }
+        throw new AssertionError("Missing column " + table + "." + column);
+    }
+
+    private boolean fkExists(
+            String childTable,
+            String childColumn,
+            String parentTable,
+            String onDelete)
+            throws Exception {
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(
+                        "PRAGMA foreign_key_list(" + childTable + ")")) {
+            while (rs.next()) {
+                if (childColumn.equals(rs.getString("from"))
+                        && parentTable.equals(rs.getString("table"))
+                        && onDelete.equals(rs.getString("on_delete"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     @Test
-    void emptyDatabaseBootstrapsV1ThroughV3() throws Exception {
+    void emptyDatabaseBootstrapsV1ThroughV4() throws Exception {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(3);
+        assertThat(history).hasSize(4);
         assertThat(history.get(0)).containsExactly("1", "SQL", "V1__create_legacy_posts.sql", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
+        assertThat(history.get(3))
+                .containsExactly("4", "SQL", "V4__add_accounts_and_ownership.sql", "1");
 
         assertThat(tableExists("posts")).isTrue();
         assertThat(tableExists("replies")).isTrue();
+        assertThat(tableExists("accounts")).isTrue();
         assertThat(tableExists("flyway_schema_history")).isTrue();
+
+        assertThat(columnExists("accounts", "id")).isTrue();
+        assertThat(columnExists("accounts", "handle")).isTrue();
+        assertThat(columnExists("accounts", "display_name")).isTrue();
+        assertThat(columnExists("accounts", "bio")).isTrue();
+        assertThat(columnExists("accounts", "password_hash")).isTrue();
+        assertThat(columnExists("accounts", "created_at")).isTrue();
+        assertThat(columnExists("accounts", "updated_at")).isTrue();
+        assertThat(columnExists("posts", "author_account_id")).isTrue();
+        assertThat(columnExists("replies", "author_account_id")).isTrue();
+        assertThat(columnIsNullable("posts", "author_account_id")).isTrue();
+        assertThat(columnIsNullable("replies", "author_account_id")).isTrue();
 
         assertThat(indexExists("idx_posts_timeline")).isTrue();
         assertThat(indexExists("idx_posts_channel_timeline")).isTrue();
         assertThat(indexExists("idx_posts_channel")).isFalse();
         assertThat(indexExists("idx_posts_created_at")).isFalse();
         assertThat(indexExists("idx_replies_post_timeline")).isTrue();
+
+        assertThat(fkExists("posts", "author_account_id", "accounts", "SET NULL")).isTrue();
+        assertThat(fkExists("replies", "author_account_id", "accounts", "SET NULL")).isTrue();
+
+        assertThat(indexExists("idx_posts_author_timeline")).isTrue();
+        assertThat(indexExists("idx_replies_author")).isTrue();
 
         try (Connection conn = DriverManager.getConnection(url);
                 Statement stmt = conn.createStatement();
@@ -130,6 +198,12 @@ class SchemaMigrationConfigTest {
             assertThat(rs.next()).isTrue();
             assertThat(rs.getInt(1)).isZero();
         }
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM accounts")) {
+            assertThat(rs.next()).isTrue();
+            assertThat(rs.getInt(1)).isZero();
+        }
     }
 
     @Test
@@ -138,24 +212,30 @@ class SchemaMigrationConfigTest {
                 "CREATE TABLE posts (id INTEGER PRIMARY KEY AUTOINCREMENT, author TEXT NOT NULL, content TEXT NOT NULL, channel TEXT NOT NULL CHECK (channel IN ('home', 'tech', 'ops')), created_at TEXT NOT NULL DEFAULT (datetime('now')))",
                 "CREATE INDEX idx_posts_channel ON posts(channel)",
                 "CREATE INDEX idx_posts_created_at ON posts(created_at DESC)",
-                "INSERT INTO posts (id, author, content, channel) VALUES (41, 'alice', 'legacy post', 'home')");
+                "INSERT INTO posts (id, author, content, channel, created_at) VALUES (41, 'alice', 'legacy post', 'home', '2024-01-02 03:04:05')");
 
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(3);
+        assertThat(history).hasSize(4);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
+        assertThat(history.get(3))
+                .containsExactly("4", "SQL", "V4__add_accounts_and_ownership.sql", "1");
 
         try (Connection conn = DriverManager.getConnection(url);
                 Statement stmt = conn.createStatement();
-                ResultSet rs = stmt.executeQuery("SELECT id, author, content, channel FROM posts")) {
+                ResultSet rs = stmt.executeQuery("""
+                        SELECT id, author, content, channel, created_at, author_account_id
+                        FROM posts""")) {
             assertThat(rs.next()).isTrue();
             assertThat(rs.getLong("id")).isEqualTo(41);
             assertThat(rs.getString("author")).isEqualTo("alice");
             assertThat(rs.getString("content")).isEqualTo("legacy post");
             assertThat(rs.getString("channel")).isEqualTo("home");
+            assertThat(rs.getString("created_at")).isEqualTo("2024-01-02 03:04:05");
+            assertThat(rs.getString("author_account_id")).isNull();
             assertThat(rs.next()).isFalse();
         }
 
@@ -165,6 +245,7 @@ class SchemaMigrationConfigTest {
         assertThat(indexExists("idx_posts_created_at")).isFalse();
         assertThat(indexExists("idx_replies_post_timeline")).isTrue();
         assertThat(tableExists("replies")).isTrue();
+        assertThat(tableExists("accounts")).isTrue();
 
         execute("INSERT INTO posts (author, content, channel) VALUES ('next', 'after migration', 'home')");
         assertThat(queryLong("SELECT MAX(id) FROM posts")).isEqualTo(42);
@@ -176,44 +257,55 @@ class SchemaMigrationConfigTest {
                 "CREATE TABLE posts (id INTEGER PRIMARY KEY AUTOINCREMENT, author TEXT NOT NULL, content TEXT NOT NULL, channel TEXT NOT NULL CHECK (channel IN ('home', 'tech', 'ops')), created_at TEXT NOT NULL DEFAULT (datetime('now')))",
                 "CREATE INDEX idx_posts_timeline ON posts(created_at DESC, id DESC)",
                 "CREATE INDEX idx_posts_channel_timeline ON posts(channel, created_at DESC, id DESC)",
-                "INSERT INTO posts (id, author, content, channel) VALUES (41, 'bob', 'current post', 'tech')",
+                "INSERT INTO posts (id, author, content, channel, created_at) VALUES (41, 'bob', 'current post', 'tech', '2024-02-03 04:05:06')",
                 "CREATE TABLE replies (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE, author TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))",
                 "CREATE INDEX idx_replies_post_timeline ON replies(post_id, created_at ASC, id ASC)",
-                "INSERT INTO replies (id, post_id, author, content) VALUES (17, 41, 'bob', 'a reply')");
+                "INSERT INTO replies (id, post_id, author, content, created_at) VALUES (17, 41, 'bob', 'a reply', '2024-02-03 04:06:07')");
 
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(3);
+        assertThat(history).hasSize(4);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
+        assertThat(history.get(3))
+                .containsExactly("4", "SQL", "V4__add_accounts_and_ownership.sql", "1");
 
         try (Connection conn = DriverManager.getConnection(url);
                 Statement stmt = conn.createStatement();
-                ResultSet rs = stmt.executeQuery("SELECT id, author, content, channel FROM posts")) {
+                ResultSet rs = stmt.executeQuery("""
+                        SELECT id, author, content, channel, created_at, author_account_id
+                        FROM posts""")) {
             assertThat(rs.next()).isTrue();
             assertThat(rs.getLong("id")).isEqualTo(41);
             assertThat(rs.getString("author")).isEqualTo("bob");
             assertThat(rs.getString("content")).isEqualTo("current post");
             assertThat(rs.getString("channel")).isEqualTo("tech");
+            assertThat(rs.getString("created_at")).isEqualTo("2024-02-03 04:05:06");
+            assertThat(rs.getString("author_account_id")).isNull();
             assertThat(rs.next()).isFalse();
         }
 
         try (Connection conn = DriverManager.getConnection(url);
                 Statement stmt = conn.createStatement();
-                ResultSet rs = stmt.executeQuery("SELECT id, post_id, author, content FROM replies")) {
+                ResultSet rs = stmt.executeQuery("""
+                        SELECT id, post_id, author, content, created_at, author_account_id
+                        FROM replies""")) {
             assertThat(rs.next()).isTrue();
             assertThat(rs.getLong("id")).isEqualTo(17);
             assertThat(rs.getLong("post_id")).isEqualTo(41);
             assertThat(rs.getString("author")).isEqualTo("bob");
             assertThat(rs.getString("content")).isEqualTo("a reply");
+            assertThat(rs.getString("created_at")).isEqualTo("2024-02-03 04:06:07");
+            assertThat(rs.getString("author_account_id")).isNull();
             assertThat(rs.next()).isFalse();
         }
 
         assertThat(indexExists("idx_posts_timeline")).isTrue();
         assertThat(indexExists("idx_posts_channel_timeline")).isTrue();
         assertThat(indexExists("idx_replies_post_timeline")).isTrue();
+        assertThat(tableExists("accounts")).isTrue();
 
         execute(
                 "INSERT INTO posts (author, content, channel) VALUES ('next', 'after migration', 'tech')",

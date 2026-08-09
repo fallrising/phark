@@ -13,6 +13,7 @@
 | [specs/002-post-replies/](./specs/002-post-replies/) | 回覆與對話串的規格、設計與任務 |
 | [specs/003-schema-migrations/](./specs/003-schema-migrations/) | SQLite 版本化 migration、legacy baseline 與復原規格 |
 | [specs/004-consistent-api-errors/](./specs/004-consistent-api-errors/) | RFC 9457 錯誤契約、validation errors 與 request correlation |
+| [specs/005-accounts-profiles/](./specs/005-accounts-profiles/) | Session authentication、CSRF、content ownership 與公開 profile |
 
 ## 部署模板
 

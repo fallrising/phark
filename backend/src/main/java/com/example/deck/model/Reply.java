@@ -6,6 +6,6 @@ public record Reply(
         long id,
         long postId,
         String author,
+        String authorHandle,
         String content,
-        Instant createdAt) {
-}
+        Instant createdAt) {}

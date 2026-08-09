@@ -52,9 +52,9 @@ public class ReplyService {
         return new ReplyPage(items, nextCursor);
     }
 
-    public Reply createReply(long postId, CreateReplyRequest request) {
+    public Reply createReply(long postId, long accountId, CreateReplyRequest request) {
         validatePost(postId);
-        return replyRepository.insert(postId, request.author().trim(), request.content().trim());
+        return replyRepository.insertOwned(postId, accountId, request.content().trim());
     }
 
     private void validatePost(long postId) {

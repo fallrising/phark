@@ -5,8 +5,8 @@ import java.time.Instant;
 public record Post(
         long id,
         String author,
+        String authorHandle,
         String content,
         String channel,
         Instant createdAt,
-        long replyCount) {
-}
+        long replyCount) {}

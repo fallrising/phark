@@ -1,3 +1,4 @@
+import type { AccountProfile } from "@/api/accounts"
 import { PostCard } from "@/components/PostCard"
 import { Button } from "@/components/ui/button"
 import type { Channel, Post } from "@/types/post"
@@ -11,20 +12,26 @@ const CHANNEL_LABELS: Record<Channel, string> = {
 interface ColumnProps {
   channel: Channel
   posts: Post[]
+  sessionAccount: AccountProfile | null
   hasMore: boolean
   loadingMore: boolean
   error: string | null
   onLoadMore: () => void
+  onAuthRequest: () => void
+  onNavigateProfile: (handle: string) => void
   onReplyCreated: (postId: number) => void
 }
 
 export function Column({
   channel,
   posts,
+  sessionAccount,
   hasMore,
   loadingMore,
   error,
   onLoadMore,
+  onAuthRequest,
+  onNavigateProfile,
   onReplyCreated,
 }: ColumnProps) {
   return (
@@ -43,6 +50,9 @@ export function Column({
             <PostCard
               key={post.id}
               post={post}
+              sessionAccount={sessionAccount}
+              onAuthRequest={onAuthRequest}
+              onNavigateProfile={onNavigateProfile}
               onReplyCreated={onReplyCreated}
             />
           ))

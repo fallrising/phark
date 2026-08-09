@@ -1,6 +1,6 @@
 # 架構與技術決策
 
-> 最後更新：2026-07-13
+> 最後更新：2026-07-30
 
 本專案目標是在**閒置 VPS** 上建立一條**單機、可重現、可回滾**的部署路徑，**不碰 Kubernetes**。
 
@@ -85,6 +85,38 @@ Spring Boot (port 8080)
 
 React build 完成後嵌入 Spring Boot `static` 目錄，production 時前後端同源。
 
+## 帳號、Session 與 content ownership
+
+```text
+Browser SPA
+  ├─ GET /api/auth/csrf + GET /api/auth/session
+  ├─ HttpOnly JSESSIONID + in-memory CSRF token
+  └─ POST/PATCH + server-selected CSRF header
+              │
+              ▼
+RequestIdFilter → Spring Security filter chain
+                  ├─ CSRF validation
+                  ├─ HttpSession SecurityContext
+                  └─ RFC 9457 401/403 writer
+                              │
+                              ▼
+Controller → AccountPrincipal.accountId → Service → SQLite ownership FK
+```
+
+Password 使用 delegating BCrypt hash；login 失敗固定為 `INVALID_CREDENTIALS`，不提供
+account enumeration signal。Login 旋轉 session ID，logout 清除 security context、
+session 與 cookie。CSRF token 不放 cookie/localStorage，login/logout 後由 SPA 重新
+取得且 mutation 不自動重試。
+
+V4 的 `posts.author_account_id`、`replies.author_account_id` 是 nullable FK。新內容
+只從 authenticated principal 寫入 ownership，同時保存 display-name snapshot；
+read 以 account 的目前 display name 為優先。V1–V3 legacy rows 不回填、不認領，
+仍以原始 `author` snapshot 顯示。
+
+HTTP session 是單 instance process memory，idle timeout 預設 30 分鐘；restart 或
+重新部署會登出所有使用者。這與 SQLite 的 replicas=1 限制一致，但不是 durable
+login。需要水平擴展時，shared session store 與 PostgreSQL 必須一起重新評估。
+
 ### 好處
 
 - 只有一個 image、一個 healthcheck
@@ -150,3 +182,5 @@ SQLite 適合第一版：
 2. **Traefik 讀取 Docker socket** — 即使 `:ro` 仍為高權限；正式加固時應改用 socket proxy 或 rootless Docker
 3. **應用容器不 publish port** — 僅 Traefik 對外開放 80/443；Docker publish 可能繞過 UFW
 4. **映像以 `sha-<commit>` 部署** — 不使用漂移的 `latest` tag 作為 production 部署目標
+5. **Session cookie 只經 HTTPS** — production profile 預設 Secure、HttpOnly、SameSite=Lax；只有本機 HTTP smoke 可顯式關閉 Secure
+6. **CSRF secrets 不持久化** — token 只存在 server session 與 SPA memory，不進 URL、storage 或 log

@@ -24,9 +24,11 @@ public class PostRepository {
     private static final DateTimeFormatter SQLITE_DATETIME =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String POST_SELECT = """
-            SELECT p.id, p.author, p.content, p.channel, p.created_at,
+            SELECT p.id, COALESCE(a.display_name, p.author) AS author,
+                   a.handle AS author_handle, p.content, p.channel, p.created_at,
                    (SELECT COUNT(*) FROM replies r WHERE r.post_id = p.id) AS reply_count
-            FROM posts p""";
+            FROM posts p
+            LEFT JOIN accounts a ON a.id = p.author_account_id""";
 
     private final JdbcClient jdbcClient;
 
@@ -35,6 +37,21 @@ public class PostRepository {
     }
 
     public List<Post> findPage(String channel, int fetchLimit, PostCursor before) {
+        return findPage(channel, null, fetchLimit, before);
+    }
+
+    public List<Post> findPageByAccountId(
+            long accountId,
+            int fetchLimit,
+            PostCursor before) {
+        return findPage(null, accountId, fetchLimit, before);
+    }
+
+    private List<Post> findPage(
+            String channel,
+            Long accountId,
+            int fetchLimit,
+            PostCursor before) {
         StringBuilder sql = new StringBuilder(POST_SELECT);
         List<String> predicates = new ArrayList<>();
         Map<String, Object> parameters = new HashMap<>();
@@ -42,6 +59,10 @@ public class PostRepository {
         if (channel != null) {
             predicates.add("p.channel = :channel");
             parameters.put("channel", channel);
+        }
+        if (accountId != null) {
+            predicates.add("p.author_account_id = :accountId");
+            parameters.put("accountId", accountId);
         }
         if (before != null) {
             predicates.add("""
@@ -92,6 +113,30 @@ public class PostRepository {
                 .orElseThrow(() -> new IllegalStateException("Failed to load inserted post"));
     }
 
+    public Post insertOwned(long accountId, String content, String channel) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        int inserted = jdbcClient
+                .sql("""
+                        INSERT INTO posts (author, content, channel, author_account_id)
+                        SELECT display_name, :content, :channel, id
+                        FROM accounts
+                        WHERE id = :accountId""")
+                .param("content", content)
+                .param("channel", channel)
+                .param("accountId", accountId)
+                .update(keyHolder);
+
+        if (inserted != 1) {
+            throw new IllegalArgumentException("Account not found");
+        }
+        Number key = keyHolder.getKey();
+        if (key == null) {
+            throw new IllegalStateException("Failed to retrieve generated post id");
+        }
+        return findById(key.longValue())
+                .orElseThrow(() -> new IllegalStateException("Failed to load inserted post"));
+    }
+
     public Optional<Post> findById(long id) {
         return jdbcClient
                 .sql(POST_SELECT + " WHERE p.id = :id")
@@ -124,6 +169,7 @@ public class PostRepository {
         return new Post(
                 rs.getLong("id"),
                 rs.getString("author"),
+                rs.getString("author_handle"),
                 rs.getString("content"),
                 rs.getString("channel"),
                 instant,

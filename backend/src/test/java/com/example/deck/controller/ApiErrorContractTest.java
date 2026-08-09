@@ -6,6 +6,8 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -66,10 +68,12 @@ class ApiErrorContractTest {
     @Test
     void validationFailedReturnsProblemDetails() throws Exception {
         String body = """
-                {"author": "", "content": "   ", "channel": "home"}
+                {"content": "   ", "channel": "home"}
                 """;
 
         mockMvc.perform(post("/api/posts")
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(problemDetails(
@@ -78,11 +82,9 @@ class ApiErrorContractTest {
                 .andExpect(jsonPath("$.detail")
                         .value("One or more request fields are invalid."))
                 .andExpect(jsonPath("$.violations").isArray())
-                .andExpect(jsonPath("$.violations.length()").value(2))
-                .andExpect(jsonPath("$.violations[0].field").value("author"))
-                .andExpect(jsonPath("$.violations[0].message").value("author must not be blank"))
-                .andExpect(jsonPath("$.violations[1].field").value("content"))
-                .andExpect(jsonPath("$.violations[1].message").value("content must not be blank"));
+                .andExpect(jsonPath("$.violations.length()").value(1))
+                .andExpect(jsonPath("$.violations[0].field").value("content"))
+                .andExpect(jsonPath("$.violations[0].message").value("content must not be blank"));
     }
 
     @ParameterizedTest
@@ -165,6 +167,8 @@ class ApiErrorContractTest {
     @Test
     void malformedJsonReturnsProblemDetails() throws Exception {
         mockMvc.perform(post("/api/posts")
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{invalid"))
                 .andExpect(problemDetails(
@@ -176,6 +180,8 @@ class ApiErrorContractTest {
     @Test
     void unsupportedMediaTypeReturnsProblemDetails() throws Exception {
         mockMvc.perform(post("/api/posts")
+                        .with(user("test"))
+                        .with(csrf())
                         .contentType(MediaType.TEXT_PLAIN)
                         .content("not json"))
                 .andExpect(problemDetails(
@@ -188,7 +194,7 @@ class ApiErrorContractTest {
 
     @Test
     void methodNotAllowedReturnsProblemDetails() throws Exception {
-        mockMvc.perform(patch("/api/posts"))
+        mockMvc.perform(patch("/api/posts").with(csrf()))
                 .andExpect(problemDetails(
                         405, "method-not-allowed", "Method not allowed",
                         "METHOD_NOT_ALLOWED", "/api/posts"))

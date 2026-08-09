@@ -3,6 +3,7 @@ export type Channel = "home" | "tech" | "ops"
 export interface Post {
   id: number
   author: string
+  authorHandle: string | null
   content: string
   channel: Channel
   createdAt: string
@@ -13,12 +14,12 @@ export interface Reply {
   id: number
   postId: number
   author: string
+  authorHandle: string | null
   content: string
   createdAt: string
 }
 
 export interface CreateReplyRequest {
-  author: string
   content: string
 }
 
@@ -28,7 +29,6 @@ export interface ReplyPage {
 }
 
 export interface CreatePostRequest {
-  author: string
   content: string
   channel: Channel
 }

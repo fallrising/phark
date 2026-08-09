@@ -176,6 +176,7 @@ docker run --rm \
   -p 8080:8080 \
   -e APP_DB_PATH=/data/deck.db \
   -e SPRING_PROFILES_ACTIVE=prod \
+  -e SESSION_COOKIE_SECURE=false \
   -v "$(pwd)/.local-data:/data" \
   deck:local
 ```
@@ -187,7 +188,9 @@ curl -fsS http://127.0.0.1:8080/actuator/health
 curl -fsS http://127.0.0.1:8080/api/posts
 ```
 
-瀏覽器開啟 http://127.0.0.1:8080，確認三欄版面與發文功能。
+瀏覽器開啟 http://127.0.0.1:8080，確認 register/login、三欄版面、authenticated
+發文／回覆與 profile。`SESSION_COOKIE_SECURE=false` 只供這個本機 HTTP smoke；VPS
+經 Traefik HTTPS 時不要覆寫 production profile 的 `true` 預設。
 
 ---
 
@@ -223,6 +226,10 @@ docker compose config
 ```
 
 此時**不要**執行 `up`，映像尚未推送。
+
+Production session cookie 為 Secure、HttpOnly、SameSite=Lax，idle timeout 預設
+30 分鐘。Session 儲存在 application memory，因此 deploy/restart 會登出既有
+使用者；這是目前單 instance 架構的已知限制。
 
 ---
 

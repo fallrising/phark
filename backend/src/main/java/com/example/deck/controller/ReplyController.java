@@ -1,11 +1,15 @@
 package com.example.deck.controller;
 
 import com.example.deck.dto.CreateReplyRequest;
+import com.example.deck.error.ApiErrorCode;
+import com.example.deck.error.ApiException;
 import com.example.deck.model.Reply;
 import com.example.deck.model.ReplyPage;
+import com.example.deck.security.AccountPrincipal;
 import com.example.deck.service.ReplyService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,7 +41,11 @@ public class ReplyController {
     @ResponseStatus(HttpStatus.CREATED)
     public Reply createReply(
             @PathVariable long postId,
+            @AuthenticationPrincipal AccountPrincipal principal,
             @Valid @RequestBody CreateReplyRequest request) {
-        return replyService.createReply(postId, request);
+        if (principal == null) {
+            throw new ApiException(ApiErrorCode.AUTHENTICATION_REQUIRED);
+        }
+        return replyService.createReply(postId, principal.getAccountId(), request);
     }
 }

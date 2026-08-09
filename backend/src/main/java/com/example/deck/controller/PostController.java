@@ -1,11 +1,15 @@
 package com.example.deck.controller;
 
 import com.example.deck.dto.CreatePostRequest;
+import com.example.deck.error.ApiErrorCode;
+import com.example.deck.error.ApiException;
 import com.example.deck.model.Post;
 import com.example.deck.model.PostPage;
+import com.example.deck.security.AccountPrincipal;
 import com.example.deck.service.PostService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -34,7 +38,12 @@ public class PostController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Post createPost(@Valid @RequestBody CreatePostRequest request) {
-        return postService.createPost(request);
+    public Post createPost(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @Valid @RequestBody CreatePostRequest request) {
+        if (principal == null) {
+            throw new ApiException(ApiErrorCode.AUTHENTICATION_REQUIRED);
+        }
+        return postService.createPost(principal.getAccountId(), request);
     }
 }
