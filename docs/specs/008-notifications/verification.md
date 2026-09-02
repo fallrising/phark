@@ -8,7 +8,8 @@
 | Commit | 範圍 |
 |--------|------|
 | `f805560` | Spec、design、風險與 54 項孫任務 |
-| This checkpoint | V7 migration、notification persistence/page projection 與 500-row retention |
+| `7a93d19` | V7 migration、notification persistence/page projection 與 500-row retention |
+| This checkpoint | Transactional reply/like/repost event emission 與 idempotency |
 
 ## Inherited baseline
 
@@ -22,9 +23,9 @@
 | Gate | 狀態 | 證據 |
 |------|------|------|
 | V7 migration/repository tests | 通過 | 11 tests；0 failures、0 errors、0 skipped |
-| Transactional event emission tests | 待執行 | C 階段 |
+| Transactional event emission tests | 通過 | 57 focused tests；0 failures、0 errors、0 skipped |
 | Notification cursor/read API/security tests | 待執行 | D 階段 |
-| Complete backend regression | 通過（B checkpoint） | 205 tests；0 failures、0 errors、0 skipped |
+| Complete backend regression | 通過（C checkpoint） | 209 tests；0 failures、0 errors、0 skipped |
 | Frontend lint/build | 待執行 | E 階段 |
 | Multi-stage Docker build | 待執行 | F 階段 |
 | Production-like runtime smoke | 待執行 | F 階段 |
@@ -92,5 +93,27 @@ Host 若仍無 JDK，使用 repository Dockerfile 或 pinned Maven container；N
   → 11 tests 通過（8 migration + 3 repository）。
 - Regression：`mvn -f backend/pom.xml -B test` → 205 tests 通過。
 - Host 無 JDK；以上 commands 在 `maven:3.9-eclipse-temurin-17` container 執行。
-- B checkpoint 尚未接 event services、read cursor/API 或 frontend；這些分別由 C、D、E 階段
-  驗證，不把 repository projection 誤報成可用 HTTP behavior。
+- B checkpoint 當時尚未接 event services、read cursor/API 或 frontend；各行為只在對應階段
+  完成後標記通過，不把 repository projection 誤報成可用 HTTP behavior。
+
+## Transactional event checkpoint evidence
+
+- RED test class 刻意沒有 `@Transactional`，避免 test transaction 掩蓋 production boundary；
+  初次 4 tests 中 3 個如預期失敗：Bob page 為空、首次 LIKE event ID 為 null，以及 abort
+  trigger 下三種來源 mutation 都錯誤地成功並各留下 1 row。Self/legacy scenario 先通過，GREEN
+  wiring 後才成為有效 guard regression。
+- `PostLikeRepository.like` 與 `PostRepostRepository.repost` 回 affected-row boolean；重送 active
+  PUT 的 database conflict 回 false，因此不建立第二個 event，也不 read-before-write。
+- `PostRepository.findAuthorAccountId` 是 nullable internal lookup，沒有把 owner account ID 加進
+  public Post JSON。三個 service 都跳過 null owner 與 self actor。
+- `ReplyService.createReply` 新增 production `@Transactional`；like/repost 沿用既有 transaction。
+  Source insert、notification insert 與 prune 共用同一 boundary，unlike/unrepost 不刪歷史事件。
+- 真實 SQLite `BEFORE INSERT ... RAISE(ABORT)` trigger 驗證 REPLY/LIKE/REPOST notification
+  failure 都拋出 `DataAccessException`，且 reply/relation row 各為 0；trigger 在 finally 移除。
+- Lifecycle 驗證首次 PUT 通知、重送不重複、取消後歷史仍在、重做產生較大新 event ID，active
+  relation count 仍為 1。
+- Focused：event、reply/like/repost mutation 與 repositories 共 57 tests 通過。
+- Regression：`mvn -f backend/pom.xml -B test` → 209 tests 通過。
+- Host 無 JDK；以上 commands 在 `maven:3.9-eclipse-temurin-17` container 執行。
+- C checkpoint 尚未公開 notification read endpoint；外部 viewer 仍無法讀通知，D 階段才新增
+  authenticated cursor/unread API 與 security/cache contracts。

@@ -35,18 +35,18 @@
 
 ## C：Transactional event emission
 
-- [ ] **C.1 RED — Reply event contract**
-  - [ ] C.1.1 測試 owned post reply 原子建立 reply + REPLY notification。
-  - [ ] C.1.2 測試 self/legacy reply 不通知且正常建立來源 row。
-  - [ ] C.1.3 測試通知寫入失敗時 reply transaction rollback。
-- [ ] **C.2 RED — Like/repost event contract**
-  - [ ] C.2.1 測試首次 PUT 建立事件、重送 PUT 不重複且 timestamp/state 不變。
-  - [ ] C.2.2 測試 self/legacy interaction 不通知且 shared relation 正常。
-  - [ ] C.2.3 測試取消不撤回、重做產生新 ID 與 notification failure rollback。
-- [ ] **C.3 GREEN/REFACTOR — Service wiring**
-  - [ ] C.3.1 讓 like/repost insert 回 affected-row signal，database unique 仍為真值。
-  - [ ] C.3.2 實作 owner lookup，將三種 event insert/prune 接到 transactional services。
-  - [ ] C.3.3 執行 focused mutation/event 與完整 backend regression。
+- [x] **C.1 RED — Reply event contract**
+  - [x] C.1.1 測試 owned post reply 原子建立 reply + REPLY notification。
+  - [x] C.1.2 測試 self/legacy reply 不通知且正常建立來源 row。
+  - [x] C.1.3 測試通知寫入失敗時 reply transaction rollback。
+- [x] **C.2 RED — Like/repost event contract**
+  - [x] C.2.1 測試首次 PUT 建立事件、重送 PUT 不重複且 timestamp/state 不變。
+  - [x] C.2.2 測試 self/legacy interaction 不通知且 shared relation 正常。
+  - [x] C.2.3 測試取消不撤回、重做產生新 ID 與 notification failure rollback。
+- [x] **C.3 GREEN/REFACTOR — Service wiring**
+  - [x] C.3.1 讓 like/repost insert 回 affected-row signal，database unique 仍為真值。
+  - [x] C.3.2 實作 owner lookup，將三種 event insert/prune 接到 transactional services。
+  - [x] C.3.3 執行 focused mutation/event 與完整 backend regression。
 
 ## D：通知 read/unread API
 

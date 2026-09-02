@@ -13,8 +13,8 @@ public class PostLikeRepository {
         this.jdbcClient = jdbcClient;
     }
 
-    public void like(long postId, long accountId) {
-        jdbcClient
+    public boolean like(long postId, long accountId) {
+        int created = jdbcClient
                 .sql("""
                         INSERT INTO post_likes (post_id, account_id)
                         VALUES (:postId, :accountId)
@@ -22,6 +22,7 @@ public class PostLikeRepository {
                 .param("postId", postId)
                 .param("accountId", accountId)
                 .update();
+        return created > 0;
     }
 
     public void unlike(long postId, long accountId) {

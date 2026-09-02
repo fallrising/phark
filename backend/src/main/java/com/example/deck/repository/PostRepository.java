@@ -272,6 +272,16 @@ public class PostRepository {
         return count > 0;
     }
 
+    public Optional<Long> findAuthorAccountId(long postId) {
+        return jdbcClient
+                .sql("""
+                        SELECT author_account_id FROM posts
+                        WHERE id = :postId AND author_account_id IS NOT NULL""")
+                .param("postId", postId)
+                .query(Long.class)
+                .optional();
+    }
+
     public void insertSeed(String author, String content, String channel) {
         jdbcClient
                 .sql("INSERT INTO posts (author, content, channel) VALUES (?, ?, ?)")
