@@ -10,7 +10,8 @@
 | `ddf78de` | Spec、design、風險與 54 項孫任務 |
 | `0b1372c` | V6 migration、repost relation persistence 與 upgrade evidence |
 | `fa828b9` | Versioned cursor、mixed timeline/profile reads 與 attribution |
-| This checkpoint | Authenticated PUT/DELETE repost API 與 security boundary |
+| `08f2853` | Authenticated PUT/DELETE repost API 與 security boundary |
+| This checkpoint | Frontend attribution、optimistic interaction 與 activity refresh |
 
 ## Inherited baseline
 
@@ -30,8 +31,8 @@
 | Mixed cursor/timeline/profile tests | 通過 | 55 focused tests；0 failures、0 errors、0 skipped |
 | Repost API/security tests | 通過 | 26 focused tests；0 failures、0 errors、0 skipped |
 | Complete backend regression | 通過（API checkpoint） | 201 tests；0 failures、0 errors、0 skipped |
-| Frontend lint | Pending | — |
-| Frontend production build | Pending | — |
+| Frontend lint | 通過 | `oxlint`；0 diagnostics |
+| Frontend production build | 通過 | TypeScript + Vite；1,862 modules transformed |
 | Multi-stage Docker build | Pending | — |
 | Production-like runtime smoke | Pending | — |
 | GitHub Actions final head | Pending | — |
@@ -122,3 +123,23 @@ Host 若仍無 JDK/Node，使用 repository Dockerfile 或 pinned Maven/Node con
   → 26 tests 通過（12 mutation + 14 security）。
 - Regression：`mvn -f backend/pom.xml -B test` → 201 tests 通過。
 - Host 無 JDK；以上 Maven commands 在 `maven:3.9-eclipse-temurin-17` container 執行。
+
+## Frontend checkpoint evidence
+
+- OpenCode 依三個 bounded slices 實作 typed API/helpers、主時間線與 profile wiring；主代理
+  逐批審查，修正 failure path 錯誤 refresh，以及 refresh 期間過早釋放 per-post guard 的
+  race。
+- `Post`/`RepostState` 與 PUT/DELETE client 對齊 backend camelCase contract；pure helpers
+  只覆寫 repost count/viewer state、count 下限為 0，並按原文 `post.id` 更新所有 copies。
+- Timeline/Profile render key 與 load-more dedup 改用 opaque `timelineEntryId`；reply、like、
+  repost interaction 仍按原文 ID 同步。
+- `PostCard` 保留原作者/原文時間並顯示 reposter attribution/time；like/repost 共用 per-post
+  guard，兩個按鈕在任一 mutation/authoritative refresh 期間都 disabled。
+- Repost failure 只 rollback repost fields；mutation success 先 reconcile authoritative state，
+  再刷新三欄或 profile first page。Profile refresh failure 不會把已成功的 mutation rollback。
+- `source ~/.nvm/nvm.sh && npm run lint` → 通過，0 diagnostics。
+- `source ~/.nvm/nvm.sh && npm run build` → TypeScript 與 Vite production build 通過，
+  1,862 modules transformed。
+- Repository 沒有 frontend test runner；依規格不新增 dependency，本 checkpoint 以 pure helper
+  review、lint 與 production TypeScript build 驗證，runtime behavior 留在 F.2 production-like
+  smoke。

@@ -2,6 +2,7 @@ export type Channel = "home" | "tech" | "ops"
 
 export interface Post {
   id: number
+  timelineEntryId: string
   author: string
   authorHandle: string | null
   content: string
@@ -10,12 +11,23 @@ export interface Post {
   replyCount: number
   likeCount: number
   likedByViewer: boolean
+  repostCount: number
+  repostedByViewer: boolean
+  repostedBy: string | null
+  repostedByHandle: string | null
+  repostedAt: string | null
 }
 
 export interface LikeState {
   postId: number
   likeCount: number
   likedByViewer: boolean
+}
+
+export interface RepostState {
+  postId: number
+  repostCount: number
+  repostedByViewer: boolean
 }
 
 export interface Reply {

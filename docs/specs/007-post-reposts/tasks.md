@@ -65,18 +65,18 @@
 
 ## E：Frontend repost experience
 
-- [ ] **E.1 Typed API 與 pure state helpers**
-  - [ ] E.1.1 擴充 Post/RepostState types 與 PUT/DELETE client functions。
-  - [ ] E.1.2 實作 repost snapshot、optimistic、reconcile 與 rollback helpers。
-  - [ ] E.1.3 驗證 count floor、repost-only patch 與 multi-copy functional update。
-- [ ] **E.2 Attribution、keys 與 interaction**
-  - [ ] E.2.1 PostCard 顯示 reposter attribution、count/state 與 accessible toggle。
-  - [ ] E.2.2 Render/load-more dedup 改用 timelineEntryId，互動同步仍用 post ID。
-  - [ ] E.2.3 以 shared per-post guard 防止 like/repost out-of-order mutations。
-- [ ] **E.3 Activity refresh 與 gate**
-  - [ ] E.3.1 App 成功後 reconcile 並刷新三欄權威 activity membership。
-  - [ ] E.3.2 ProfileView 同步 optimistic fields 並刷新 profile activity page。
-  - [ ] E.3.3 執行 frontend lint、TypeScript 與 production build。
+- [x] **E.1 Typed API 與 pure state helpers**
+  - [x] E.1.1 擴充 Post/RepostState types 與 PUT/DELETE client functions。
+  - [x] E.1.2 實作 repost snapshot、optimistic、reconcile 與 rollback helpers。
+  - [x] E.1.3 驗證 count floor、repost-only patch 與 multi-copy functional update。
+- [x] **E.2 Attribution、keys 與 interaction**
+  - [x] E.2.1 PostCard 顯示 reposter attribution、count/state 與 accessible toggle。
+  - [x] E.2.2 Render/load-more dedup 改用 timelineEntryId，互動同步仍用 post ID。
+  - [x] E.2.3 以 shared per-post guard 防止 like/repost out-of-order mutations。
+- [x] **E.3 Activity refresh 與 gate**
+  - [x] E.3.1 App 成功後 reconcile 並刷新三欄權威 activity membership。
+  - [x] E.3.2 ProfileView 同步 optimistic fields 並刷新 profile activity page。
+  - [x] E.3.3 執行 frontend lint、TypeScript 與 production build。
 
 ## F：文件與整合交付
 
