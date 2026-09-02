@@ -88,7 +88,7 @@
   - [x] F.2.1 Docker multi-stage build 與 clean/V4-to-V5 migration。
   - [x] F.2.2 Runtime 驗證 register/login/like/idempotency/viewer isolation。
   - [x] F.2.3 Runtime 驗證 unlike/anonymous/CSRF/profile/SPA failure paths。
-- [ ] **F.3 CI 與交付**
+- [x] **F.3 CI 與交付**
   - [x] F.3.1 推送所有階段 commits 並維護 draft PR。
-  - [ ] F.3.2 GitHub Actions final head 全綠。
-  - [ ] F.3.3 固化 verification evidence、完成 SDD-006 並 merge。
+  - [x] F.3.2 GitHub Actions final head 全綠。
+  - [x] F.3.3 固化 verification evidence、完成 SDD-006 並 merge。

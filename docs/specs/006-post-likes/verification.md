@@ -1,6 +1,6 @@
 # SDD-006 驗證紀錄
 
-> 狀態：In Progress
+> 狀態：Complete
 > Branch：`agent/likes`
 
 ## Checkpoints
@@ -12,7 +12,8 @@
 | `7bac5ea` | Viewer-aware timeline/profile reads 與 private cache policy |
 | `e8f3abb` | Authenticated idempotent PUT/DELETE like API |
 | `4411017` | Frontend optimistic interaction、reconcile 與 rollback |
-| This checkpoint | 開發/營運文件、production image 與 runtime smoke evidence |
+| `4ab9531` | 開發/營運文件、production image 與 runtime smoke evidence |
+| This checkpoint | Final SDD status、task tree、roadmap 與 CI evidence |
 
 ## Required gates
 
@@ -25,7 +26,7 @@
 | Frontend production build | 通過 | TypeScript project build + Vite；1861 modules |
 | Multi-stage Docker build | 通過 | 164 backend tests；Vite 1861 modules；non-root production image |
 | Production-like runtime smoke | 通過 | Health、SPA、two-viewer like lifecycle、anonymous/CSRF/profile isolation |
-| GitHub Actions final head | Pending | — |
+| GitHub Actions delivery head | 通過 | CI run `33618930908`；Build container image job 通過（4m02s） |
 
 完成時記錄 exact commands、test counts、image digest、runtime scenarios、workflow run/job URL
 與 commit SHA；未實際執行的 gate 不標記為通過。
@@ -98,3 +99,14 @@ Image `phark:sdd006` 以 `SPRING_PROFILES_ACTIVE=prod`、
   仍為 1，證明沒有 mutation side effect。
 - Alice/Bob/anonymous timeline 與 Alice profile posts 都回一致 count；viewer state 依
   session 隔離，viewer-aware GET 都有 `Cache-Control: private, no-store`。
+
+## GitHub delivery evidence
+
+- Delivery evidence commit：`4ab9531d3ecab9d99533d1139d6417189fb9abc9`。
+- CI workflow run：
+  `https://github.com/fallrising/phark/actions/runs/33618930908` → success。
+- `Build container image` job：
+  `https://github.com/fallrising/phark/actions/runs/33618930908/job/100211178858` → success，
+  4m02s。
+- Draft PR：`https://github.com/fallrising/phark/pull/6`；final documentation head 仍須以
+  同一 CI workflow 通過後才轉 ready 與 merge。

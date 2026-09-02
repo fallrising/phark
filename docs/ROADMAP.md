@@ -31,7 +31,7 @@
   - [x] handle、display name、bio
   - [x] session authentication 與 CSRF
   - [x] author ownership、legacy compatibility 與 profile page
-- [~] **SDD-006 — Likes**
+- [x] **SDD-006 — Likes**
   - [x] idempotent like/unlike
   - [x] per-user uniqueness
   - [x] timeline optimistic update
