@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { LogIn, LogOut, UserPlus } from "lucide-react"
+import { Bell, LogIn, LogOut, UserPlus } from "lucide-react"
 
 import {
   login,
@@ -15,7 +15,9 @@ import { Label } from "@/components/ui/label"
 interface AccountControlsProps {
   account: AccountProfile | null
   securityReady: boolean | null
+  unreadCount: number
   onAccountChanged: (account: AccountProfile | null) => Promise<void>
+  onNavigateNotifications: () => void
   onNavigateProfile: (handle: string) => void
   onRetrySecurity: () => Promise<void>
 }
@@ -25,7 +27,9 @@ type AuthMode = "login" | "register"
 export function AccountControls({
   account,
   securityReady,
+  unreadCount,
   onAccountChanged,
+  onNavigateNotifications,
   onNavigateProfile,
   onRetrySecurity,
 }: AccountControlsProps) {
@@ -120,6 +124,23 @@ export function AccountControls({
             @{account.handle}
           </span>
         </button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onNavigateNotifications}
+        >
+          <Bell className="size-3.5" />
+          Notifications
+          {unreadCount > 0 ? (
+            <span
+              aria-label={`${unreadCount} unread notifications`}
+              className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          ) : null}
+        </Button>
         <Button
           type="button"
           variant="outline"

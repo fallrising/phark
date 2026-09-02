@@ -65,18 +65,18 @@
 
 ## E：Frontend notification center
 
-- [ ] **E.1 Typed API 與 session state**
-  - [ ] E.1.1 新增 notification item/page/read types 與 GET/PUT client functions。
-  - [ ] E.1.2 將 badge summary 接到 identity success/account switch lifecycle。
-  - [ ] E.1.3 Logout/anonymous 清空 notification state 且不發 protected request。
-- [ ] **E.2 Route、page 與 badge**
-  - [ ] E.2.1 AccountControls 新增 accessible notifications link 與 capped badge。
-  - [ ] E.2.2 App 新增 `/notifications` route 與 authenticated NotificationView。
-  - [ ] E.2.3 顯示三 type attribution/content/read state、empty/loading/error states。
-- [ ] **E.3 Pagination/read interaction 與 gate**
-  - [ ] E.3.1 以 notification ID/cursor append/dedup 並防 stale account response。
-  - [ ] E.3.2 Mark-all-read 成功同步 page/header，失敗精確保留 unread state。
-  - [ ] E.3.3 執行 frontend lint、TypeScript 與 production build。
+- [x] **E.1 Typed API 與 session state**
+  - [x] E.1.1 新增 notification item/page/read types 與 GET/PUT client functions。
+  - [x] E.1.2 將 badge summary 接到 identity success/account switch lifecycle。
+  - [x] E.1.3 Logout/anonymous 清空 notification state 且不發 protected request。
+- [x] **E.2 Route、page 與 badge**
+  - [x] E.2.1 AccountControls 新增 accessible notifications link 與 capped badge。
+  - [x] E.2.2 App 新增 `/notifications` route 與 authenticated NotificationView。
+  - [x] E.2.3 顯示三 type attribution/content/read state、empty/loading/error states。
+- [x] **E.3 Pagination/read interaction 與 gate**
+  - [x] E.3.1 以 notification ID/cursor append/dedup 並防 stale account response。
+  - [x] E.3.2 Mark-all-read 成功同步 page/header，失敗精確保留 unread state。
+  - [x] E.3.3 執行 frontend lint、TypeScript 與 production build。
 
 ## F：文件與整合交付
 

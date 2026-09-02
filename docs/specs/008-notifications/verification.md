@@ -10,7 +10,8 @@
 | `f805560` | Spec、design、風險與 54 項孫任務 |
 | `7a93d19` | V7 migration、notification persistence/page projection 與 500-row retention |
 | `4472573` | Transactional reply/like/repost event emission 與 idempotency |
-| This checkpoint | Strict notification cursor、read-through、HTTP API 與 security/cache contract |
+| `7f6df3a` | Strict notification cursor、read-through、HTTP API 與 security/cache contract |
+| This checkpoint | Typed notification client、badge/session state、route、page 與 interactions |
 
 ## Inherited baseline
 
@@ -27,7 +28,7 @@
 | Transactional event emission tests | 通過 | 57 focused tests；0 failures、0 errors、0 skipped |
 | Notification cursor/read API/security tests | 通過 | 65 tests；0 failures、0 errors、0 skipped |
 | Complete backend regression | 通過（D checkpoint） | 257 tests；0 failures、0 errors、0 skipped |
-| Frontend lint/build | 待執行 | E 階段 |
+| Frontend lint/build | 通過 | oxlint、TypeScript 與 Vite production build；1,864 modules |
 | Multi-stage Docker build | 待執行 | F 階段 |
 | Production-like runtime smoke | 待執行 | F 階段 |
 | GitHub Actions delivery head | 待執行 | F 階段 |
@@ -143,3 +144,24 @@ Host 若仍無 JDK，使用 repository Dockerfile 或 pinned Maven container；N
 - Focused：cursor/repository/read/API/security 共 65 tests 通過。
 - Regression：`mvn -f backend/pom.xml -B test` → 257 tests 通過。
 - Host 無 JDK；以上 commands 在 `maven:3.9-eclipse-temurin-17` container 執行。
+
+## Frontend notification center checkpoint evidence
+
+- 新增 readonly notification item/page/read state types 與 same-origin GET/PUT client；PUT 沿用共用
+  in-memory CSRF boundary，不在 feature code 複製 token 或 credential handling。
+- App 在 session identity success 與 account transition 取得第一頁 summary；anonymous/logout path
+  立即以 empty state 取代前一帳號資料且不呼叫 notification API。每次 refresh 增加 request version，
+  account switch、route refresh 或 logout 後的舊 response 不得更新新 viewer state。
+- `/notifications` 支援 direct/load/popstate client route，進入時 refresh。Authenticated header 顯示
+  Notifications control，unread > 0 顯示 accessible badge，視覺值上限 `99+`；anonymous 不顯示 badge
+  且 page 提供 sign-in action。
+- NotificationView 顯示 REPLY/LIKE/REPOST attribution、current post/reply content、timestamp 與可見
+  Read/Unread 狀態；loading、empty、error、Load more 與 disabled/pending Mark all read 都有明確 UI。
+- Pagination 保存 opaque cursor、用 notification ID append/dedup，且以 request version 拒絕 stale
+  response。Mark-all-read 只送 latest cursor；成功套用 server unread/read-through 並標示所有已載入
+  items read，失敗只更新 error/pending，保留既有 items 與 unread badge。
+- OpenCode DeepSeek V4 Flash 分別產生 typed API 與 presentational view 初稿；主代理要求 mark-read
+  zero-unread 狀態由 hidden 改為 rendered-disabled 後才接受，App/session/state wiring 由主代理完成。
+- `npm run lint` → 通過。
+- `npm run build`（`tsc -b && vite build`）→ 通過；Vite 轉換 1,864 modules，產出 production assets。
+- Production browser/session behavior 尚需 F 階段 Docker runtime smoke，不以靜態 build 取代。
