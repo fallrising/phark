@@ -35,7 +35,7 @@
   - [x] idempotent like/unlike
   - [x] per-user uniqueness
   - [x] timeline optimistic update
-- [ ] **SDD-007 — Reposts**
+- [~] **SDD-007 — Reposts**
   - [ ] repost/unrepost
   - [ ] original post attribution
   - [ ] timeline fan-out 規則
