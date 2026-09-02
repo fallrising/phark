@@ -35,18 +35,18 @@
 
 ## C：Mixed timeline 與 attribution
 
-- [ ] **C.1 RED — Cursor/read contract**
-  - [ ] C.1.1 測試同秒 original/repost mixed ordering 與逐頁不漏不重。
-  - [ ] C.1.2 測試 legacy cursor decode、v2 canonical validation 與 invalid tokens。
-  - [ ] C.1.3 測試 channel/profile fan-out、attribution 與 activity identity。
-- [ ] **C.2 GREEN — Query/model/cursor wiring**
-  - [ ] C.2.1 擴充 Post、TimelinePost projection 與 RepostState models。
-  - [ ] C.2.2 實作 original/repost UNION、tuple predicate 與 limit+1 page。
-  - [ ] C.2.3 實作 versioned encoder/decoder 與 legacy positive-post compatibility。
-- [ ] **C.3 GREEN/REFACTOR — Viewer/shared state regressions**
-  - [ ] C.3.1 計算 repost count/EXISTS 並保持 private no-store cache。
-  - [ ] C.3.2 保持原文 ID、reply/like fields、author snapshot 與 channel semantics。
-  - [ ] C.3.3 執行 focused cursor/controller/repository 與完整 backend suite。
+- [x] **C.1 RED — Cursor/read contract**
+  - [x] C.1.1 測試同秒 original/repost mixed ordering 與逐頁不漏不重。
+  - [x] C.1.2 測試 legacy cursor decode、v2 canonical validation 與 invalid tokens。
+  - [x] C.1.3 測試 channel/profile fan-out、attribution 與 activity identity。
+- [x] **C.2 GREEN — Query/model/cursor wiring**
+  - [x] C.2.1 擴充 Post、TimelinePost projection 與 RepostState models。
+  - [x] C.2.2 實作 original/repost UNION、tuple predicate 與 limit+1 page。
+  - [x] C.2.3 實作 versioned encoder/decoder 與 legacy positive-post compatibility。
+- [x] **C.3 GREEN/REFACTOR — Viewer/shared state regressions**
+  - [x] C.3.1 計算 repost count/EXISTS 並保持 private no-store cache。
+  - [x] C.3.2 保持原文 ID、reply/like fields、author snapshot 與 channel semantics。
+  - [x] C.3.3 執行 focused cursor/controller/repository 與完整 backend suite。
 
 ## D：Authenticated repost API
 
