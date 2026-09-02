@@ -1,6 +1,7 @@
 package com.example.deck.repository;
 
 import com.example.deck.model.NotificationItem;
+import com.example.deck.model.NotificationSummary;
 import com.example.deck.model.NotificationType;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -67,6 +68,39 @@ public class NotificationRepository {
                           )""")
                 .param("recipientAccountId", recipientAccountId)
                 .update();
+    }
+
+    public NotificationSummary findSummary(long recipientId) {
+        return jdbcClient
+                .sql("""
+                        WITH state AS (
+                            SELECT :recipientId AS recipient_account_id,
+                                   r.read_through_id
+                            FROM notification_read_state r
+                            WHERE r.account_id = :recipientId
+                            UNION ALL
+                            SELECT :recipientId, NULL
+                            WHERE NOT EXISTS (
+                                SELECT 1 FROM notification_read_state r
+                                WHERE r.account_id = :recipientId)
+                        )
+                        SELECT MAX(n.id) AS latest_id,
+                               COALESCE(s.read_through_id, 0) AS read_through_id,
+                               COUNT(CASE
+                                   WHEN n.id > COALESCE(s.read_through_id, 0) THEN 1 END)
+                                   AS unread_count
+                        FROM state s
+                        LEFT JOIN notifications n
+                            ON n.recipient_account_id = s.recipient_account_id""")
+                .param("recipientId", recipientId)
+                .query((rs, rowNum) -> {
+                    long latestId = rs.getLong("latest_id");
+                    return new NotificationSummary(
+                            rs.wasNull() ? null : latestId,
+                            rs.getLong("read_through_id"),
+                            rs.getLong("unread_count"));
+                })
+                .single();
     }
 
     public List<NotificationItem> findPage(

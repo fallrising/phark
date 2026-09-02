@@ -9,7 +9,8 @@
 |--------|------|
 | `f805560` | Spec、design、風險與 54 項孫任務 |
 | `7a93d19` | V7 migration、notification persistence/page projection 與 500-row retention |
-| This checkpoint | Transactional reply/like/repost event emission 與 idempotency |
+| `4472573` | Transactional reply/like/repost event emission 與 idempotency |
+| This checkpoint | Strict notification cursor、read-through、HTTP API 與 security/cache contract |
 
 ## Inherited baseline
 
@@ -24,8 +25,8 @@
 |------|------|------|
 | V7 migration/repository tests | 通過 | 11 tests；0 failures、0 errors、0 skipped |
 | Transactional event emission tests | 通過 | 57 focused tests；0 failures、0 errors、0 skipped |
-| Notification cursor/read API/security tests | 待執行 | D 階段 |
-| Complete backend regression | 通過（C checkpoint） | 209 tests；0 failures、0 errors、0 skipped |
+| Notification cursor/read API/security tests | 通過 | 65 tests；0 failures、0 errors、0 skipped |
+| Complete backend regression | 通過（D checkpoint） | 257 tests；0 failures、0 errors、0 skipped |
 | Frontend lint/build | 待執行 | E 階段 |
 | Multi-stage Docker build | 待執行 | F 階段 |
 | Production-like runtime smoke | 待執行 | F 階段 |
@@ -62,7 +63,7 @@ run/job URL 與 commit SHA；未實際執行的 gate 不標記為通過。
 ```text
 mvn -f backend/pom.xml -B -Dtest=SchemaMigrationConfigTest,NotificationRepositoryTest test
 mvn -f backend/pom.xml -B -Dtest=NotificationEventContractTest,PostLikeMutationContractTest,PostRepostMutationContractTest,ReplyControllerTest test
-mvn -f backend/pom.xml -B -Dtest=NotificationCursorCodecTest,NotificationControllerTest,AuthSecurityContractTest test
+mvn -f backend/pom.xml -B -Dtest=NotificationCursorCodecTest,NotificationRepositoryTest,NotificationReadRepositoryTest,NotificationControllerTest,AuthSecurityContractTest test
 mvn -f backend/pom.xml -B test
 npm run lint
 npm run build
@@ -117,3 +118,28 @@ Host 若仍無 JDK，使用 repository Dockerfile 或 pinned Maven container；N
 - Host 無 JDK；以上 commands 在 `maven:3.9-eclipse-temurin-17` container 執行。
 - C checkpoint 尚未公開 notification read endpoint；外部 viewer 仍無法讀通知，D 階段才新增
   authenticated cursor/unread API 與 security/cache contracts。
+
+## Read/unread API checkpoint evidence
+
+- Cursor/read RED 首次 focused compile 只缺少計畫中的 `NotificationCursor`、
+  `NotificationCursorCodec`、`NotificationSummary`、`NotificationReadRepository` 與
+  `findSummary(long)` symbols。OpenCode 初稿的 lookahead boundary 會跳過一筆，主代理拒絕後
+  修正為 repository 接收 `pageSize + 1`、next cursor 指向最後一筆 delivered row；25 筆 traversal
+  精確 newest-to-oldest 且無缺漏/重複。
+- Strict cursor 固定 `id=91` token 為 `MTo5MQ`，拒絕 padding、illegal alphabet、malformed UTF-8、
+  wrong version/shape、非正數、sign/leading zero/whitespace、overflow、timeline legacy 與解碼相同但
+  re-encode 不 canonical 的 `MTo5MR`。
+- Summary/read repository 驗證 empty/read flags、retained unread count、monotonic max、recipient
+  isolation 與第 501 筆 prune 後 ownership。GREEN review 額外發現 zero retained rows 會遺失既有
+  high-water；新增 regression 先得到 `expected: 100L but was: 0L`，再改用 recipient/read-state
+  rooted CTE，保留可指向已 prune/cascade ID 的 read-through。
+- HTTP/security RED：`NotificationControllerTest` 13 cases 中 12 個因 endpoint/matcher 未存在而
+  取得 404（預期 200/400/401），既有 CSRF rejection case 先通過。GREEN 後 13/13 通過，涵蓋
+  current-content projection、global latest/unread、strict paging、read lifecycle、other-account paging
+  boundary、owned read cursor、RFC problem codes、anonymous matcher ordering、CSRF 與 private no-store。
+- `NotificationService` 以 read-only transaction 組合 summary 與 `limit + 1` page，以 write
+  transaction 原子驗證 owned retained cursor、monotonic upsert 並重算 unread；public JSON 只使用
+  camelCase cursor strings，不暴露 internal account ID。
+- Focused：cursor/repository/read/API/security 共 65 tests 通過。
+- Regression：`mvn -f backend/pom.xml -B test` → 257 tests 通過。
+- Host 無 JDK；以上 commands 在 `maven:3.9-eclipse-temurin-17` container 執行。

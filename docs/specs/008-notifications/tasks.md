@@ -50,18 +50,18 @@
 
 ## D：通知 read/unread API
 
-- [ ] **D.1 RED — Cursor/read model contract**
-  - [ ] D.1.1 測試 v1 cursor encode/decode 與 strict canonical invalid cases。
-  - [ ] D.1.2 測試 ID-desc limit+1 分頁、latest/read-through 與逐頁不漏不重。
-  - [ ] D.1.3 測試 unread count、monotonic max、owned retained cursor validation。
-- [ ] **D.2 RED — API/security contract**
-  - [ ] D.2.1 測試 authenticated page/read lifecycle 與 camelCase response。
-  - [ ] D.2.2 測試 invalid limit/cursor/body 與 other-account cursor 無副作用。
-  - [ ] D.2.3 測試 anonymous/CSRF 拒絕、private no-store 與 matcher ordering。
-- [ ] **D.3 GREEN/REFACTOR — Controller/service wiring**
-  - [ ] D.3.1 實作 cursor codec、summary/read repository、service 與 page/read models。
-  - [ ] D.3.2 實作 GET/PUT controller、validation 與 explicit security matchers。
-  - [ ] D.3.3 執行 focused cursor/API/security 與完整 backend suite。
+- [x] **D.1 RED — Cursor/read model contract**
+  - [x] D.1.1 測試 v1 cursor encode/decode 與 strict canonical invalid cases。
+  - [x] D.1.2 測試 ID-desc limit+1 分頁、latest/read-through 與逐頁不漏不重。
+  - [x] D.1.3 測試 unread count、monotonic max、owned retained cursor validation。
+- [x] **D.2 RED — API/security contract**
+  - [x] D.2.1 測試 authenticated page/read lifecycle 與 camelCase response。
+  - [x] D.2.2 測試 invalid limit/cursor/body 與 other-account cursor 無副作用。
+  - [x] D.2.3 測試 anonymous/CSRF 拒絕、private no-store 與 matcher ordering。
+- [x] **D.3 GREEN/REFACTOR — Controller/service wiring**
+  - [x] D.3.1 實作 cursor codec、summary/read repository、service 與 page/read models。
+  - [x] D.3.2 實作 GET/PUT controller、validation 與 explicit security matchers。
+  - [x] D.3.3 執行 focused cursor/API/security 與完整 backend suite。
 
 ## E：Frontend notification center
 

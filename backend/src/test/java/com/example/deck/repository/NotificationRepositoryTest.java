@@ -5,10 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.deck.model.Account;
 import com.example.deck.model.NotificationItem;
+import com.example.deck.model.NotificationSummary;
 import com.example.deck.model.NotificationType;
 import com.example.deck.model.Post;
 import com.example.deck.model.Reply;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -186,6 +188,115 @@ class NotificationRepositoryTest {
         List<Long> traversed = pageAllIds(bob.id());
         assertThat(traversed).hasSize(500).doesNotHaveDuplicates();
         assertThat(traversed).contains(fiveHundredFirst).doesNotContain(oldestBobId);
+    }
+
+    @Test
+    void summaryReportsLatestRetainedReadThroughAndRetainedUnreadCount() {
+        Account bob = accountRepository.insert("bob", "Bob", "hash");
+        Account carol = accountRepository.insert("carol", "Carol", "hash");
+        Account alice = accountRepository.insert("alice", "Alice", "hash");
+        Post post = postRepository.insertOwned(bob.id(), "Bob post", "home");
+
+        long first = notificationRepository.insertAndPrune(
+                bob.id(), alice.id(), post.id(), null, NotificationType.LIKE);
+        long second = notificationRepository.insertAndPrune(
+                bob.id(), alice.id(), post.id(), null, NotificationType.LIKE);
+        long third = notificationRepository.insertAndPrune(
+                bob.id(), alice.id(), post.id(), null, NotificationType.LIKE);
+
+        jdbcClient
+                .sql("""
+                        INSERT INTO notification_read_state (account_id, read_through_id)
+                        VALUES (:accountId, :readThrough)""")
+                .param("accountId", bob.id())
+                .param("readThrough", second)
+                .update();
+
+        NotificationSummary bobSummary = notificationRepository.findSummary(bob.id());
+        assertThat(bobSummary.latestRetainedId()).isEqualTo(third);
+        assertThat(bobSummary.readThroughId()).isEqualTo(second);
+        assertThat(bobSummary.unreadCount()).isEqualTo(1);
+
+        NotificationSummary carolSummary = notificationRepository.findSummary(carol.id());
+        assertThat(carolSummary.latestRetainedId()).isNull();
+        assertThat(carolSummary.readThroughId()).isZero();
+        assertThat(carolSummary.unreadCount()).isZero();
+
+        assertThat(first).isLessThan(second).isLessThan(third);
+    }
+
+    @Test
+    void summaryIsBoundedToRetainedRowsAfterPrune() {
+        Account bob = accountRepository.insert("bob", "Bob", "hash");
+        Account actor = accountRepository.insert("actor", "Actor", "hash");
+        Post post = postRepository.insertOwned(bob.id(), "Bob post", "home");
+
+        List<Long> ids = new ArrayList<>();
+        for (int i = 0; i < 501; i++) {
+            ids.add(notificationRepository.insertAndPrune(
+                    bob.id(), actor.id(), post.id(), null, NotificationType.LIKE));
+        }
+
+        NotificationSummary summary = notificationRepository.findSummary(bob.id());
+        assertThat(summary.latestRetainedId()).isEqualTo(ids.get(500));
+        assertThat(summary.readThroughId()).isZero();
+        assertThat(summary.unreadCount()).isEqualTo(500);
+    }
+
+    @Test
+    void strictKeysetPagingHonorsQueryLimitAndReachesAllRowsNewestToOldest() {
+        Account bob = accountRepository.insert("bob", "Bob", "hash");
+        Account alice = accountRepository.insert("alice", "Alice", "hash");
+        Post post = postRepository.insertOwned(bob.id(), "Bob post", "home");
+
+        List<Long> inserted = new ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            inserted.add(notificationRepository.insertAndPrune(
+                    bob.id(), alice.id(), post.id(), null, NotificationType.LIKE));
+        }
+        long newest = inserted.get(inserted.size() - 1);
+
+        List<NotificationItem> firstPage = notificationRepository.findPage(bob.id(), 11, null, 0);
+        assertThat(firstPage).hasSize(11);
+        assertThat(firstPage)
+                .extracting(NotificationItem::id)
+                .isSortedAccordingTo(Comparator.reverseOrder());
+        assertThat(firstPage.get(0).id()).isEqualTo(newest);
+
+        long lastDeliveredBefore = firstPage.get(9).id();
+        List<NotificationItem> olderPage =
+                notificationRepository.findPage(bob.id(), 11, lastDeliveredBefore, 0);
+        assertThat(olderPage).isNotEmpty();
+        assertThat(olderPage)
+                .extracting(NotificationItem::id)
+                .allSatisfy(id -> assertThat(id).isLessThan(lastDeliveredBefore))
+                .doesNotContain(newest);
+
+        List<Long> expected = new ArrayList<>(inserted);
+        expected.sort(Comparator.reverseOrder());
+        assertThat(pageAllWithLookahead(bob.id(), 10)).containsExactlyElementsOf(expected);
+
+        NotificationSummary summary = notificationRepository.findSummary(bob.id());
+        assertThat(summary.latestRetainedId()).isEqualTo(newest);
+        assertThat(summary.readThroughId()).isZero();
+        assertThat(summary.unreadCount()).isEqualTo(25);
+    }
+
+    private List<Long> pageAllWithLookahead(long recipientId, int pageSize) {
+        List<Long> ids = new ArrayList<>();
+        Long beforeId = null;
+        while (true) {
+            List<NotificationItem> page =
+                    notificationRepository.findPage(recipientId, pageSize + 1, beforeId, 0);
+            int delivered = Math.min(page.size(), pageSize);
+            for (int i = 0; i < delivered; i++) {
+                ids.add(page.get(i).id());
+            }
+            if (page.size() <= pageSize) {
+                return ids;
+            }
+            beforeId = page.get(pageSize - 1).id();
+        }
     }
 
     private List<Long> pageAllIds(long recipientId) {
