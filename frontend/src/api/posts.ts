@@ -8,6 +8,7 @@ import type {
   PostPage,
   Reply,
   ReplyPage,
+  RepostState,
 } from "@/types/post"
 
 export { getApiErrorMessage }
@@ -72,6 +73,18 @@ export function likePost(postId: number): Promise<LikeState> {
 
 export function unlikePost(postId: number): Promise<LikeState> {
   return apiRequest<LikeState>(`/api/posts/${postId}/like`, {
+    method: "DELETE",
+  })
+}
+
+export function repostPost(postId: number): Promise<RepostState> {
+  return apiRequest<RepostState>(`/api/posts/${postId}/repost`, {
+    method: "PUT",
+  })
+}
+
+export function unrepostPost(postId: number): Promise<RepostState> {
+  return apiRequest<RepostState>(`/api/posts/${postId}/repost`, {
     method: "DELETE",
   })
 }

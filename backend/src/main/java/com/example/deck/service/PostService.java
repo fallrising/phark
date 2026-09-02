@@ -6,6 +6,7 @@ import com.example.deck.error.ApiException;
 import com.example.deck.model.Post;
 import com.example.deck.model.PostCursor;
 import com.example.deck.model.PostPage;
+import com.example.deck.model.TimelinePost;
 import com.example.deck.repository.PostRepository;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
@@ -39,7 +40,8 @@ public class PostService {
 
         PostCursor beforeCursor = decodeCursor(before);
         return toPage(
-                postRepository.findPage(channel, limit + 1, beforeCursor, viewerAccountId),
+                postRepository.findTimelinePage(
+                        channel, limit + 1, beforeCursor, viewerAccountId),
                 limit);
     }
 
@@ -56,7 +58,7 @@ public class PostService {
 
         PostCursor beforeCursor = decodeCursor(before);
         return toPage(
-                postRepository.findPageByAccountId(
+                postRepository.findTimelinePageByAccountId(
                         accountId, limit + 1, beforeCursor, viewerAccountId),
                 limit);
     }
@@ -73,13 +75,14 @@ public class PostService {
         return beforeCursor;
     }
 
-    private PostPage toPage(List<Post> fetchedItems, int limit) {
+    private PostPage toPage(List<TimelinePost> fetchedItems, int limit) {
         boolean hasMore = fetchedItems.size() > limit;
-        List<Post> items = hasMore
+        List<TimelinePost> page = hasMore
                 ? List.copyOf(fetchedItems.subList(0, limit))
                 : List.copyOf(fetchedItems);
+        List<Post> items = page.stream().map(TimelinePost::post).toList();
         String nextCursor = hasMore
-                ? cursorCodec.encode(toCursor(items.get(items.size() - 1)))
+                ? cursorCodec.encode(page.get(page.size() - 1).cursor())
                 : null;
 
         return new PostPage(items, nextCursor);
@@ -119,9 +122,5 @@ public class PostService {
         if (limit < 1 || limit > 100) {
             throw new ApiException(ApiErrorCode.INVALID_LIMIT);
         }
-    }
-
-    private PostCursor toCursor(Post post) {
-        return new PostCursor(post.createdAt(), post.id());
     }
 }

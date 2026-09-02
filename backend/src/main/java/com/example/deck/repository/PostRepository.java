@@ -2,6 +2,8 @@ package com.example.deck.repository;
 
 import com.example.deck.model.Post;
 import com.example.deck.model.PostCursor;
+import com.example.deck.model.TimelineEntryKind;
+import com.example.deck.model.TimelinePost;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -23,21 +25,71 @@ public class PostRepository {
 
     private static final DateTimeFormatter SQLITE_DATETIME =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final String POST_SELECT = """
+    private static final String ORIGINAL_POST_SELECT = """
             SELECT p.id, COALESCE(a.display_name, p.author) AS author,
                    a.handle AS author_handle, p.content, p.channel, p.created_at,
                    (SELECT COUNT(*) FROM replies r WHERE r.post_id = p.id) AS reply_count,
                    (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
-                   %s AS liked_by_viewer
+                   0 AS liked_by_viewer,
+                   (SELECT COUNT(*) FROM post_reposts pr WHERE pr.post_id = p.id)
+                       AS repost_count,
+                   0 AS reposted_by_viewer,
+                   'post:' || p.id AS timeline_entry_id,
+                   NULL AS reposted_by,
+                   NULL AS reposted_by_handle,
+                   NULL AS reposted_at
             FROM posts p
             LEFT JOIN accounts a ON a.id = p.author_account_id""";
-    private static final String ANONYMOUS_LIKED = "0";
     private static final String VIEWER_LIKED = """
             EXISTS(
                 SELECT 1 FROM post_likes viewer_like
                 WHERE viewer_like.post_id = p.id
                   AND viewer_like.account_id = :viewerAccountId
             )""";
+    private static final String VIEWER_REPOSTED = """
+            EXISTS(
+                SELECT 1 FROM post_reposts viewer_repost
+                WHERE viewer_repost.post_id = p.id
+                  AND viewer_repost.account_id = :viewerAccountId
+            )""";
+    private static final String TIMELINE_SELECT = """
+            SELECT p.id, COALESCE(author.display_name, p.author) AS author,
+                   author.handle AS author_handle, p.content, p.channel, p.created_at,
+                   (SELECT COUNT(*) FROM replies r WHERE r.post_id = p.id) AS reply_count,
+                   (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
+                   %s AS liked_by_viewer,
+                   (SELECT COUNT(*) FROM post_reposts pr WHERE pr.post_id = p.id)
+                       AS repost_count,
+                   %s AS reposted_by_viewer,
+                   activity.timeline_entry_id, activity.reposted_by,
+                   activity.reposted_by_handle, activity.reposted_at,
+                   activity.activity_at, activity.entry_kind, activity.entry_id
+            FROM (
+                SELECT original.id AS post_id,
+                       'post:' || original.id AS timeline_entry_id,
+                       original.created_at AS activity_at,
+                       %d AS entry_kind,
+                       original.id AS entry_id,
+                       original.author_account_id AS profile_account_id,
+                       NULL AS reposted_by,
+                       NULL AS reposted_by_handle,
+                       NULL AS reposted_at
+                FROM posts original
+                UNION ALL
+                SELECT repost.post_id,
+                       'repost:' || repost.id AS timeline_entry_id,
+                       repost.created_at AS activity_at,
+                       %d AS entry_kind,
+                       repost.id AS entry_id,
+                       repost.account_id AS profile_account_id,
+                       reposter.display_name AS reposted_by,
+                       reposter.handle AS reposted_by_handle,
+                       repost.created_at AS reposted_at
+                FROM post_reposts repost
+                JOIN accounts reposter ON reposter.id = repost.account_id
+            ) activity
+            JOIN posts p ON p.id = activity.post_id
+            LEFT JOIN accounts author ON author.id = p.author_account_id""";
 
     private final JdbcClient jdbcClient;
 
@@ -46,7 +98,7 @@ public class PostRepository {
     }
 
     public List<Post> findPage(String channel, int fetchLimit, PostCursor before) {
-        return findPage(channel, null, fetchLimit, before, null);
+        return posts(findTimelinePage(channel, fetchLimit, before, null));
     }
 
     public List<Post> findPage(
@@ -54,14 +106,14 @@ public class PostRepository {
             int fetchLimit,
             PostCursor before,
             Long viewerAccountId) {
-        return findPage(channel, null, fetchLimit, before, viewerAccountId);
+        return posts(findTimelinePage(channel, fetchLimit, before, viewerAccountId));
     }
 
     public List<Post> findPageByAccountId(
             long accountId,
             int fetchLimit,
             PostCursor before) {
-        return findPage(null, accountId, fetchLimit, before, null);
+        return posts(findTimelinePageByAccountId(accountId, fetchLimit, before, null));
     }
 
     public List<Post> findPageByAccountId(
@@ -69,17 +121,39 @@ public class PostRepository {
             int fetchLimit,
             PostCursor before,
             Long viewerAccountId) {
-        return findPage(null, accountId, fetchLimit, before, viewerAccountId);
+        return posts(findTimelinePageByAccountId(
+                accountId, fetchLimit, before, viewerAccountId));
     }
 
-    private List<Post> findPage(
+    public List<TimelinePost> findTimelinePage(
             String channel,
-            Long authorAccountId,
             int fetchLimit,
             PostCursor before,
             Long viewerAccountId) {
-        String likedExpression = viewerAccountId == null ? ANONYMOUS_LIKED : VIEWER_LIKED;
-        StringBuilder sql = new StringBuilder(POST_SELECT.formatted(likedExpression));
+        return findTimelinePage(channel, null, fetchLimit, before, viewerAccountId);
+    }
+
+    public List<TimelinePost> findTimelinePageByAccountId(
+            long accountId,
+            int fetchLimit,
+            PostCursor before,
+            Long viewerAccountId) {
+        return findTimelinePage(null, accountId, fetchLimit, before, viewerAccountId);
+    }
+
+    private List<TimelinePost> findTimelinePage(
+            String channel,
+            Long profileAccountId,
+            int fetchLimit,
+            PostCursor before,
+            Long viewerAccountId) {
+        String likedExpression = viewerAccountId == null ? "0" : VIEWER_LIKED;
+        String repostedExpression = viewerAccountId == null ? "0" : VIEWER_REPOSTED;
+        StringBuilder sql = new StringBuilder(TIMELINE_SELECT.formatted(
+                likedExpression,
+                repostedExpression,
+                TimelineEntryKind.POST.sortOrder(),
+                TimelineEntryKind.REPOST.sortOrder()));
         List<String> predicates = new ArrayList<>();
         Map<String, Object> parameters = new HashMap<>();
 
@@ -91,32 +165,45 @@ public class PostRepository {
             predicates.add("p.channel = :channel");
             parameters.put("channel", channel);
         }
-        if (authorAccountId != null) {
-            predicates.add("p.author_account_id = :accountId");
-            parameters.put("accountId", authorAccountId);
+        if (profileAccountId != null) {
+            predicates.add("activity.profile_account_id = :accountId");
+            parameters.put("accountId", profileAccountId);
         }
         if (before != null) {
             predicates.add("""
-                    (p.created_at < :beforeCreatedAt
-                        OR (p.created_at = :beforeCreatedAt AND p.id < :beforeId))""");
+                    (activity.activity_at < :beforeCreatedAt
+                        OR (activity.activity_at = :beforeCreatedAt
+                            AND activity.entry_kind < :beforeEntryKind)
+                        OR (activity.activity_at = :beforeCreatedAt
+                            AND activity.entry_kind = :beforeEntryKind
+                            AND activity.entry_id < :beforeEntryId))""");
             parameters.put(
                     "beforeCreatedAt",
                     LocalDateTime.ofInstant(before.createdAt(), ZoneOffset.UTC)
                             .format(SQLITE_DATETIME));
-            parameters.put("beforeId", before.id());
+            parameters.put("beforeEntryKind", before.entryKind().sortOrder());
+            parameters.put("beforeEntryId", before.id());
         }
         if (!predicates.isEmpty()) {
             sql.append(" WHERE ").append(String.join(" AND ", predicates));
         }
 
-        sql.append(" ORDER BY p.created_at DESC, p.id DESC LIMIT :fetchLimit");
+        sql.append(' ').append("""
+                ORDER BY activity.activity_at DESC,
+                         activity.entry_kind DESC,
+                         activity.entry_id DESC
+                LIMIT :fetchLimit""");
         parameters.put("fetchLimit", fetchLimit);
 
         return jdbcClient
                 .sql(sql.toString())
                 .params(parameters)
-                .query(this::mapPost)
+                .query(this::mapTimelinePost)
                 .list();
+    }
+
+    private List<Post> posts(List<TimelinePost> timelinePosts) {
+        return timelinePosts.stream().map(TimelinePost::post).toList();
     }
 
     public long count() {
@@ -170,7 +257,7 @@ public class PostRepository {
 
     public Optional<Post> findById(long id) {
         return jdbcClient
-                .sql(POST_SELECT.formatted(ANONYMOUS_LIKED) + " WHERE p.id = :id")
+                .sql(ORIGINAL_POST_SELECT + " WHERE p.id = :id")
                 .param("id", id)
                 .query(this::mapPost)
                 .optional();
@@ -195,17 +282,44 @@ public class PostRepository {
     }
 
     private Post mapPost(ResultSet rs, int rowNum) throws SQLException {
-        String createdAt = rs.getString("created_at");
-        Instant instant = LocalDateTime.parse(createdAt, SQLITE_DATETIME).toInstant(ZoneOffset.UTC);
+        String repostedAt = rs.getString("reposted_at");
         return new Post(
                 rs.getLong("id"),
                 rs.getString("author"),
                 rs.getString("author_handle"),
                 rs.getString("content"),
                 rs.getString("channel"),
-                instant,
+                parseInstant(rs.getString("created_at")),
                 rs.getLong("reply_count"),
                 rs.getLong("like_count"),
-                rs.getBoolean("liked_by_viewer"));
+                rs.getBoolean("liked_by_viewer"),
+                rs.getString("timeline_entry_id"),
+                rs.getLong("repost_count"),
+                rs.getBoolean("reposted_by_viewer"),
+                rs.getString("reposted_by"),
+                rs.getString("reposted_by_handle"),
+                repostedAt == null ? null : parseInstant(repostedAt));
+    }
+
+    private TimelinePost mapTimelinePost(ResultSet rs, int rowNum) throws SQLException {
+        TimelineEntryKind entryKind = entryKind(rs.getInt("entry_kind"));
+        PostCursor cursor = new PostCursor(
+                parseInstant(rs.getString("activity_at")),
+                entryKind,
+                rs.getLong("entry_id"));
+        return new TimelinePost(mapPost(rs, rowNum), cursor);
+    }
+
+    private TimelineEntryKind entryKind(int sortOrder) throws SQLException {
+        for (TimelineEntryKind entryKind : TimelineEntryKind.values()) {
+            if (entryKind.sortOrder() == sortOrder) {
+                return entryKind;
+            }
+        }
+        throw new SQLException("Unknown timeline entry kind order: " + sortOrder);
+    }
+
+    private Instant parseInstant(String value) {
+        return LocalDateTime.parse(value, SQLITE_DATETIME).toInstant(ZoneOffset.UTC);
     }
 }

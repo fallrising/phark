@@ -1,6 +1,6 @@
 # Phark 產品任務樹
 
-> 最後更新：2026-08-09
+> 最後更新：2026-09-02
 
 狀態：`[x]` 完成、`[~]` 進行中、`[ ]` 待辦。優先級由 P0 到 P2。
 
@@ -35,10 +35,10 @@
   - [x] idempotent like/unlike
   - [x] per-user uniqueness
   - [x] timeline optimistic update
-- [ ] **SDD-007 — Reposts**
-  - [ ] repost/unrepost
-  - [ ] original post attribution
-  - [ ] timeline fan-out 規則
+- [x] **SDD-007 — Reposts**
+  - [x] repost/unrepost
+  - [x] original post attribution
+  - [x] timeline fan-out 規則
 - [ ] **SDD-008 — Notifications**
   - [ ] reply/like/repost events
   - [ ] unread cursor

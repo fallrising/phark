@@ -13,18 +13,18 @@ phark/
 │       │   ├── java/com/example/deck/
 │       │   │   ├── DeckApplication.java
 │       │   │   ├── config/       # Database, migration, security 與 SPA config
-│       │   │   ├── controller/   # Auth、account、profile、post、reply、like APIs
+│       │   │   ├── controller/   # Auth、account、profile、post、reply、like、repost APIs
 │       │   │   ├── dto/          # JSON request/response boundaries
 │       │   │   ├── error/        # RFC 9457 codes、exception mapper、violations
-│       │   │   ├── model/        # Account、profile、content 與 page contracts
-│       │   │   ├── repository/   # Account/Post/Reply/PostLike JdbcClient repositories
+│       │   │   ├── model/        # Account、profile、content、RepostState 與 page contracts
+│       │   │   ├── repository/   # Account/Post/Reply/PostLike/PostRepost JdbcClient repositories
 │       │   │   ├── security/     # Principal、UserDetails 與 Problem writers
-│       │   │   ├── service/      # Account、Post、Reply、PostLike services
+│       │   │   ├── service/      # Account、Post、Reply、PostLike、PostRepost services
 │       │   │   └── web/          # Request correlation filter
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       ├── application-prod.properties
-│       │       └── db/migration/  # Immutable Flyway V1...V5
+│       │       └── db/migration/  # Immutable Flyway V1...V6
 │       └── test/
 ├── frontend/                # React + TypeScript + Vite + shadcn/ui
 │   ├── package.json
@@ -33,8 +33,9 @@ phark/
 │   └── src/
 │       ├── api/client.ts    # Problem Details、same-origin fetch、CSRF memory
 │       ├── api/accounts.ts  # Account/session/profile typed calls
-│       ├── api/posts.ts     # Post/reply typed calls
+│       ├── api/posts.ts     # Post/reply/like/repost typed calls
 │       ├── components/      # Auth、profile、timeline、composer、ui/*
+│       ├── lib/postReposts.ts  # repost snapshot/optimistic/rollback pure helpers
 │       └── types/post.ts
 ├── Dockerfile               # multi-stage build
 ├── .dockerignore
@@ -57,14 +58,16 @@ phark/
 | 帳號 | Register、login、logout 與 30 分鐘 server-side session |
 | Profile | 公開 profile、作者文章分頁與 owner display name/bio 編輯 |
 | Likes | 每帳號冪等 like/unlike、權威 count 與 optimistic rollback |
+| Reposts | 每帳號冪等 repost/unrepost、original attribution 與 mixed timeline fan-out |
 | 自動刷新 | 發文後三欄自動重新載入 |
 
 ## REST API
 
 ### `GET /api/posts`
 
-回傳最新一頁文章。排序固定為 `created_at DESC, id DESC`，使用 keyset cursor，
-不使用 `OFFSET`。
+回傳最新一頁 original/repost activities。排序固定為
+`activity_at DESC, entry_kind DESC, entry_id DESC`，使用 keyset cursor，不使用
+`OFFSET`。
 
 ```http
 GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
@@ -81,6 +84,7 @@ GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
   "items": [
     {
       "id": 1,
+      "timelineEntryId": "post:1",
       "author": "Alice",
       "authorHandle": "alice_ops",
       "content": "Hello",
@@ -88,7 +92,12 @@ GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
       "createdAt": "2026-07-13T10:00:00Z",
       "replyCount": 2,
       "likeCount": 3,
-      "likedByViewer": true
+      "likedByViewer": true,
+      "repostCount": 3,
+      "repostedByViewer": false,
+      "repostedBy": null,
+      "repostedByHandle": null,
+      "repostedAt": null
     }
   ],
   "nextCursor": null
@@ -97,6 +106,15 @@ GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
 
 若仍有更舊資料，`nextCursor` 為 URL-safe Base64 字串；否則為 `null`。無效的
 channel、limit 或 cursor 回傳 `400 Bad Request`。
+
+Mixed timeline 每個 item 加上 shared `repostCount` 與 session 專屬
+`repostedByViewer`，以及 nullable repost attribution。每個 item 的 `id` 永遠是原文
+ID；`timelineEntryId` 是 non-null opaque stable key（client 只可比較相等與作為
+render/dedup key，不可解析），Original activity 的 `repostedBy`、`repostedByHandle`、
+`repostedAt` 為 null，repost activity 則 non-null。排序固定為
+`activity_at DESC, entry_kind DESC, entry_id DESC`；「更多」分頁使用 versioned mixed
+cursor（decoder 仍接受 SDD-001–006 的 legacy `<epoch>:<postId>` cursor）。Timeline 與
+profile-post GET 因 viewer-aware fields 而標記 `Cache-Control: private, no-store`。
 
 ### `POST /api/posts`
 
@@ -120,6 +138,7 @@ channel、limit 或 cursor 回傳 `400 Bad Request`。
 ```json
 {
   "id": 1,
+  "timelineEntryId": "post:1",
   "author": "Alice",
   "authorHandle": "alice_ops",
   "content": "Hello",
@@ -127,7 +146,12 @@ channel、limit 或 cursor 回傳 `400 Bad Request`。
   "createdAt": "2026-07-13T10:00:00Z",
   "replyCount": 0,
   "likeCount": 0,
-  "likedByViewer": false
+  "likedByViewer": false,
+  "repostCount": 0,
+  "repostedByViewer": false,
+  "repostedBy": null,
+  "repostedByHandle": null,
+  "repostedAt": null
 }
 ```
 
@@ -180,6 +204,29 @@ Timeline 與 profile-post GET 的 `likeCount` 對所有 viewer 相同；
 `likedByViewer` 依目前 session 計算，anonymous 固定為 false。這兩種 response 使用
 `Cache-Control: private, no-store`，不可放進共享 cache。
 
+### `PUT /api/posts/{postId}/repost` / `DELETE /api/posts/{postId}/repost`
+
+兩者都需 authenticated session 與有效 CSRF，而且都可安全重送。PUT 在 relation
+已存在時為 no-op（不更新 timestamp，不 bump activity）；DELETE 在 relation 不存在時
+為 no-op。成功一律回 `200`：
+
+```json
+{
+  "postId": 42,
+  "repostCount": 3,
+  "repostedByViewer": true
+}
+```
+
+Actor 只取自 session，不接受 request body。`postId <= 0` 回 `INVALID_POST_ID`，
+不存在的正 ID 回 `POST_NOT_FOUND`。Self-repost 與 legacy post repost 都允許；mutation
+不改原文 timestamp、content、channel、likes 或 replies。DELETE 只移除目前 actor 的
+repost activity；不刪原文、其他人的 repost、likes 或 replies。
+
+Timeline 與 profile-post GET 的 `repostCount` 對所有 viewer 相同；
+`repostedByViewer` 依目前 session 計算，anonymous 固定為 false。這兩種 response 使用
+`Cache-Control: private, no-store`，不可放進共享 cache。
+
 ### 帳號、Session 與 CSRF
 
 | Method | Path | Auth | 說明 |
@@ -191,7 +238,7 @@ Timeline 與 profile-post GET 的 `likeCount` 對所有 viewer 相同；
 | POST | `/api/auth/logout` | Session + CSRF | 清除 context、session 與 cookie；成功 204 |
 | GET | `/api/profiles/{handle}` | Public | 公開 profile |
 | PATCH | `/api/profiles/me` | Session + CSRF | 修改自己的 display name 與 bio |
-| GET | `/api/profiles/{handle}/posts` | Public | 作者文章 keyset page |
+| GET | `/api/profiles/{handle}/posts` | Public | 該帳號 original/repost activity keyset page |
 
 Handle canonicalize 為 lowercase，必須是 3–15 個 ASCII `a-z`、`0-9`、`_`。
 Display name 為 1–50 characters，bio 最多 160 characters，password 為 12–72
@@ -287,6 +334,21 @@ Request ID 只用於關聯 response 與 server log，不是 authentication 或�
 ### Seed Data
 
 啟動時若資料庫無文章，自動建立至少 9 筆（每個 channel 各 3 筆）。邏輯位於 `PostService.seedData()`。
+
+### Frontend Repost Interaction
+
+每個原文同時最多一個互動 mutation（like 或 repost）in flight，避免 repost 成功後
+的 page refresh 與另一個 reaction response 互相覆蓋：
+
+- `PostCard` 只 render attribution/count/state 並送 intent，不私藏 server state。
+- Render key 與 load-more dedup 使用 `timelineEntryId`；同一原文的多個 activity
+  不可用 `post.id` 去重。
+- Like、reply 與 repost state patch 仍用原文 `id`，讓所有 visible copies 同步。
+- Pure helper snapshot/rollback（`lib/postReposts.ts`）只含 repost fields，不覆蓋
+  concurrent like/reply/attribution。
+- Repost success 後重新載入權威 first page，新增或移除 actor activity；不以 client
+  clock 偽造 `repostedAt`。Stale request version 不可覆蓋較新的 identity/feed load。
+- Anonymous 不送 request；顯示登入 feedback。
 
 ## 環境變數
 
@@ -405,7 +467,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 | 範圍 | 命令 | 覆蓋 |
 |------|------|------|
-| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content/likes、migration、errors |
+| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content/likes/reposts、mixed timeline/cursor、migration、errors |
 | Frontend lint | `npm run lint`（在 `frontend/`） | oxlint |
 | Frontend build | `npm run build`（在 `frontend/`） | TypeScript + Vite |
 | 整合 | `docker build -t stream-deck .` | 含 frontend lint/build + Maven test |

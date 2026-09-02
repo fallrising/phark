@@ -15,6 +15,7 @@
 | [specs/004-consistent-api-errors/](./specs/004-consistent-api-errors/) | RFC 9457 錯誤契約、validation errors 與 request correlation |
 | [specs/005-accounts-profiles/](./specs/005-accounts-profiles/) | Session authentication、CSRF、content ownership 與公開 profile |
 | [specs/006-post-likes/](./specs/006-post-likes/) | 冪等 post likes、viewer-aware count 與 optimistic UI |
+| [specs/007-post-reposts/](./specs/007-post-reposts/) | Repost attribution、mixed timeline fan-out 與相容 cursor |
 
 ## 部署模板
 

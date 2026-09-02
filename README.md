@@ -48,17 +48,22 @@ curl -fsS http://localhost:8080/actuator/health
 | POST | `/api/posts` | 以 session identity 建立文章（需登入與 CSRF） |
 | PUT | `/api/posts/{postId}/like` | 冪等按讚；回傳權威 count/state（需登入與 CSRF） |
 | DELETE | `/api/posts/{postId}/like` | 冪等取消按讚（需登入與 CSRF） |
+| PUT | `/api/posts/{postId}/repost` | 冪等轉發；回傳權威 RepostState（需登入與 CSRF） |
+| DELETE | `/api/posts/{postId}/repost` | 冪等取消轉發（需登入與 CSRF） |
 | GET | `/api/posts/{postId}/replies?limit=20&after=...` | 正序讀取回覆 |
 | POST | `/api/posts/{postId}/replies` | 以 session identity 建立單層回覆 |
 | GET | `/api/profiles/{handle}` | 公開 profile |
 | PATCH | `/api/profiles/me` | 修改自己的 display name/bio |
-| GET | `/api/profiles/{handle}/posts` | 該帳號的 cursor-paginated posts |
+| GET | `/api/profiles/{handle}/posts` | 該帳號的 cursor-paginated original/repost activities |
 
 `GET /api/posts` 回傳 `{ "items": [...], "nextCursor": "..." }`。將非空的
 `nextCursor` 作為下一次 request 的 `before`；`limit` 允許 `1..100`。
 回覆 page 使用相同 response envelope，將 `nextCursor` 作為 `after`。
-文章 item 包含共享 `likeCount` 與目前 session 專屬 `likedByViewer`；anonymous
-固定看到 `likedByViewer=false`。
+文章 item 包含共享 `likeCount`、`repostCount` 與目前 session 專屬
+`likedByViewer`、`repostedByViewer`；anonymous 固定看到 `likedByViewer=false`
+與 `repostedByViewer=false`。轉發 activity 包含 nullable 的 `repostedBy`、
+`repostedByHandle`、`repostedAt` attribution；original activity 的 attribution
+為 null。每個 item 都有 non-null `timelineEntryId` 作為 stable opaque dedup key。
 
 每個 response 都包含 `X-Request-ID`。API 錯誤使用
 `application/problem+json`（RFC 9457），以穩定的 `code` 供程式判斷，並在 body
@@ -95,4 +100,5 @@ Browser client 啟動時先並行取得 CSRF token 與 session，所有 `POST`�
 - [x] 單層回覆與 inline conversation threads
 - [x] Session accounts、可信作者歸屬與公開 profiles
 - [x] Per-account 冪等 likes 與 optimistic UI
+- [x] Per-account 冪等 reposts、original attribution 與 mixed timeline fan-out
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）

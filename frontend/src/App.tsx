@@ -7,7 +7,13 @@ import {
   type AccountProfile,
 } from "@/api/accounts"
 import { getApiErrorMessage } from "@/api/client"
-import { fetchPosts, likePost, unlikePost } from "@/api/posts"
+import {
+  fetchPosts,
+  likePost,
+  repostPost,
+  unlikePost,
+  unrepostPost,
+} from "@/api/posts"
 import { AccountControls } from "@/components/AccountControls"
 import { Column } from "@/components/Column"
 import { Composer } from "@/components/Composer"
@@ -18,7 +24,12 @@ import {
   optimisticLikeState,
   snapshotLikeState,
 } from "@/lib/postLikes"
-import type { Channel, LikeState, Post } from "@/types/post"
+import {
+  applyRepostStateToPosts,
+  optimisticRepostState,
+  snapshotRepostState,
+} from "@/lib/postReposts"
+import type { Channel, LikeState, Post, RepostState } from "@/types/post"
 
 const CHANNELS: Channel[] = ["home", "tech", "ops"]
 
@@ -57,6 +68,21 @@ function applyLikeStateToFeeds(
   }
 }
 
+function applyRepostStateToFeeds(
+  feeds: Record<Channel, ChannelFeed>,
+  state: RepostState
+): Record<Channel, ChannelFeed> {
+  const updateFeed = (feed: ChannelFeed): ChannelFeed => ({
+    ...feed,
+    items: applyRepostStateToPosts(feed.items, state),
+  })
+  return {
+    home: updateFeed(feeds.home),
+    tech: updateFeed(feeds.tech),
+    ops: updateFeed(feeds.ops),
+  }
+}
+
 function readRoute(): Route {
   const profileMatch = window.location.pathname.match(/^\/profiles\/([^/]+)\/?$/)
   if (profileMatch) {
@@ -83,9 +109,11 @@ export default function App() {
   const [profileRefreshVersion, setProfileRefreshVersion] = useState(0)
   const [pendingLikeIds, setPendingLikeIds] = useState<Set<number>>(new Set())
   const [likeErrors, setLikeErrors] = useState<Record<number, string>>({})
+  const [pendingRepostIds, setPendingRepostIds] = useState<Set<number>>(new Set())
+  const [repostErrors, setRepostErrors] = useState<Record<number, string>>({})
   const refreshVersion = useRef(0)
   const loadingChannels = useRef(new Set<Channel>())
-  const likeMutations = useRef(new Set<number>())
+  const postMutations = useRef(new Set<number>())
   const bootStarted = useRef(false)
   const accountControlsRef = useRef<HTMLDivElement>(null)
 
@@ -95,6 +123,7 @@ export default function App() {
     setLoading(true)
     setError(null)
     setLikeErrors({})
+    setRepostErrors({})
 
     try {
       const results = await Promise.all(
@@ -171,8 +200,12 @@ export default function App() {
         }
 
         setFeeds((current) => {
-          const knownIds = new Set(current[channel].items.map((post) => post.id))
-          const newItems = page.items.filter((post) => !knownIds.has(post.id))
+          const knownIds = new Set(
+            current[channel].items.map((post) => post.timelineEntryId)
+          )
+          const newItems = page.items.filter(
+            (post) => !knownIds.has(post.timelineEntryId)
+          )
           return {
             ...current,
             [channel]: {
@@ -247,12 +280,12 @@ export default function App() {
         }))
         return
       }
-      if (likeMutations.current.has(post.id)) return
+      if (postMutations.current.has(post.id)) return
 
       const snapshot = snapshotLikeState(post)
       const optimistic = optimisticLikeState(snapshot)
       const requestVersion = refreshVersion.current
-      likeMutations.current.add(post.id)
+      postMutations.current.add(post.id)
       setPendingLikeIds((current) => new Set(current).add(post.id))
       setLikeErrors((current) => {
         const next = { ...current }
@@ -280,7 +313,7 @@ export default function App() {
           }))
         }
       } finally {
-        likeMutations.current.delete(post.id)
+        postMutations.current.delete(post.id)
         setPendingLikeIds((current) => {
           const next = new Set(current)
           next.delete(post.id)
@@ -289,6 +322,78 @@ export default function App() {
       }
     },
     [requestAuthentication, securityReady, sessionAccount]
+  )
+
+  const handleToggleRepost = useCallback(
+    async (post: Post) => {
+      if (sessionAccount === null) {
+        setRepostErrors((current) => ({
+          ...current,
+          [post.id]: "Sign in to repost this post.",
+        }))
+        requestAuthentication()
+        return
+      }
+      if (securityReady !== true) {
+        setRepostErrors((current) => ({
+          ...current,
+          [post.id]:
+            securityReady === null
+              ? "Secure actions are still initializing."
+              : "Secure actions are unavailable. Retry account security setup.",
+        }))
+        return
+      }
+      if (postMutations.current.has(post.id)) return
+
+      const snapshot = snapshotRepostState(post)
+      const optimistic = optimisticRepostState(snapshot)
+      const requestVersion = refreshVersion.current
+      postMutations.current.add(post.id)
+      setPendingRepostIds((current) => new Set(current).add(post.id))
+      setRepostErrors((current) => {
+        const next = { ...current }
+        delete next[post.id]
+        return next
+      })
+      setFeeds((current) => applyRepostStateToFeeds(current, optimistic))
+
+      try {
+        let mutationSucceeded = false
+        try {
+          const state = snapshot.repostedByViewer
+            ? await unrepostPost(post.id)
+            : await repostPost(post.id)
+          mutationSucceeded = true
+          if (requestVersion === refreshVersion.current) {
+            setFeeds((current) => applyRepostStateToFeeds(current, state))
+          }
+        } catch (error) {
+          if (requestVersion === refreshVersion.current) {
+            setFeeds((current) => applyRepostStateToFeeds(current, snapshot))
+            setRepostErrors((current) => ({
+              ...current,
+              [post.id]: getApiErrorMessage(
+                error,
+                "Unable to update this repost. Please try again."
+              ),
+            }))
+          }
+        }
+
+        if (mutationSucceeded) {
+          await loadPosts()
+        }
+      } finally {
+        postMutations.current.delete(post.id)
+        setPendingRepostIds((current) => {
+          const next = new Set(current)
+          next.delete(post.id)
+          return next
+        })
+      }
+    },
+    [requestAuthentication, loadPosts, securityReady, sessionAccount]
   )
 
   const navigateHome = useCallback(() => {
@@ -443,6 +548,8 @@ export default function App() {
                     sessionAccount={sessionAccount}
                     pendingLikeIds={pendingLikeIds}
                     likeErrors={likeErrors}
+                    pendingRepostIds={pendingRepostIds}
+                    repostErrors={repostErrors}
                     hasMore={feed.nextCursor !== null}
                     loadingMore={feed.loadingMore}
                     error={feed.error}
@@ -451,6 +558,7 @@ export default function App() {
                     onNavigateProfile={navigateProfile}
                     onReplyCreated={handleReplyCreated}
                     onToggleLike={handleToggleLike}
+                    onToggleRepost={handleToggleRepost}
                   />
                 )
               })}

@@ -15,6 +15,8 @@ interface ColumnProps {
   sessionAccount: AccountProfile | null
   pendingLikeIds: ReadonlySet<number>
   likeErrors: Readonly<Record<number, string>>
+  pendingRepostIds: ReadonlySet<number>
+  repostErrors: Readonly<Record<number, string>>
   hasMore: boolean
   loadingMore: boolean
   error: string | null
@@ -23,6 +25,7 @@ interface ColumnProps {
   onNavigateProfile: (handle: string) => void
   onReplyCreated: (postId: number) => void
   onToggleLike: (post: Post) => Promise<void>
+  onToggleRepost: (post: Post) => Promise<void>
 }
 
 export function Column({
@@ -31,6 +34,8 @@ export function Column({
   sessionAccount,
   pendingLikeIds,
   likeErrors,
+  pendingRepostIds,
+  repostErrors,
   hasMore,
   loadingMore,
   error,
@@ -39,6 +44,7 @@ export function Column({
   onNavigateProfile,
   onReplyCreated,
   onToggleLike,
+  onToggleRepost,
 }: ColumnProps) {
   return (
     <section className="flex h-full min-w-[280px] flex-1 flex-col rounded-2xl border border-border/70 bg-muted/30 md:min-w-0">
@@ -54,15 +60,18 @@ export function Column({
         ) : (
           posts.map((post) => (
             <PostCard
-              key={post.id}
+              key={post.timelineEntryId}
               post={post}
               sessionAccount={sessionAccount}
               likePending={pendingLikeIds.has(post.id)}
               likeError={likeErrors[post.id] ?? null}
+              repostPending={pendingRepostIds.has(post.id)}
+              repostError={repostErrors[post.id] ?? null}
               onAuthRequest={onAuthRequest}
               onNavigateProfile={onNavigateProfile}
               onReplyCreated={onReplyCreated}
               onToggleLike={onToggleLike}
+              onToggleRepost={onToggleRepost}
             />
           ))
         )}

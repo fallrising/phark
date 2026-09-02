@@ -8,7 +8,12 @@ import {
   type AccountProfile,
 } from "@/api/accounts"
 import { getApiErrorMessage } from "@/api/client"
-import { likePost, unlikePost } from "@/api/posts"
+import {
+  likePost,
+  repostPost,
+  unlikePost,
+  unrepostPost,
+} from "@/api/posts"
 import { PostCard } from "@/components/PostCard"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +24,11 @@ import {
   optimisticLikeState,
   snapshotLikeState,
 } from "@/lib/postLikes"
+import {
+  applyRepostStateToPosts,
+  optimisticRepostState,
+  snapshotRepostState,
+} from "@/lib/postReposts"
 import type { Post } from "@/types/post"
 
 interface ProfileViewProps {
@@ -58,8 +68,10 @@ export function ProfileView({
   const [saving, setSaving] = useState(false)
   const [pendingLikeIds, setPendingLikeIds] = useState<Set<number>>(new Set())
   const [likeErrors, setLikeErrors] = useState<Record<number, string>>({})
+  const [pendingRepostIds, setPendingRepostIds] = useState<Set<number>>(new Set())
+  const [repostErrors, setRepostErrors] = useState<Record<number, string>>({})
   const requestVersion = useRef(0)
-  const likeMutations = useRef(new Set<number>())
+  const interactionMutations = useRef(new Set<number>())
 
   const loadProfile = useCallback(async () => {
     if (securityReady === null) return
@@ -110,8 +122,13 @@ export function ProfileView({
     try {
       const page = await fetchProfilePosts(handle, { before: nextCursor })
       setPosts((current) => {
-        const knownIds = new Set(current.map((post) => post.id))
-        return [...current, ...page.items.filter((post) => !knownIds.has(post.id))]
+        const knownIds = new Set(
+          current.map((post) => post.timelineEntryId)
+        )
+        return [
+          ...current,
+          ...page.items.filter((post) => !knownIds.has(post.timelineEntryId)),
+        ]
       })
       setNextCursor(page.nextCursor)
     } catch (error) {
@@ -194,12 +211,12 @@ export function ProfileView({
       }))
       return
     }
-    if (likeMutations.current.has(post.id)) return
+    if (interactionMutations.current.has(post.id)) return
 
     const snapshot = snapshotLikeState(post)
     const optimistic = optimisticLikeState(snapshot)
     const version = requestVersion.current
-    likeMutations.current.add(post.id)
+    interactionMutations.current.add(post.id)
     setPendingLikeIds((current) => new Set(current).add(post.id))
     setLikeErrors((current) => {
       const next = { ...current }
@@ -227,8 +244,93 @@ export function ProfileView({
         }))
       }
     } finally {
-      likeMutations.current.delete(post.id)
+      interactionMutations.current.delete(post.id)
       setPendingLikeIds((current) => {
+        const next = new Set(current)
+        next.delete(post.id)
+        return next
+      })
+    }
+  }
+
+  async function handleToggleRepost(post: Post) {
+    if (sessionAccount === null) {
+      setRepostErrors((current) => ({
+        ...current,
+        [post.id]: "Sign in to repost this post.",
+      }))
+      onAuthRequest()
+      return
+    }
+    if (securityReady !== true) {
+      setRepostErrors((current) => ({
+        ...current,
+        [post.id]:
+          securityReady === null
+            ? "Secure actions are still initializing."
+            : "Secure actions are unavailable. Retry account security setup.",
+      }))
+      return
+    }
+    if (interactionMutations.current.has(post.id)) return
+
+    const snapshot = snapshotRepostState(post)
+    const optimistic = optimisticRepostState(snapshot)
+    const version = requestVersion.current
+    interactionMutations.current.add(post.id)
+    setPendingRepostIds((current) => new Set(current).add(post.id))
+    setRepostErrors((current) => {
+      const next = { ...current }
+      delete next[post.id]
+      return next
+    })
+    setPosts((current) => applyRepostStateToPosts(current, optimistic))
+
+    try {
+      let mutationSucceeded = false
+      try {
+        const state = snapshot.repostedByViewer
+          ? await unrepostPost(post.id)
+          : await repostPost(post.id)
+        if (version === requestVersion.current) {
+          setPosts((current) => applyRepostStateToPosts(current, state))
+          mutationSucceeded = true
+        }
+      } catch (error) {
+        if (version === requestVersion.current) {
+          setPosts((current) => applyRepostStateToPosts(current, snapshot))
+          setRepostErrors((current) => ({
+            ...current,
+            [post.id]: getApiErrorMessage(
+              error,
+              "Unable to update this repost. Please try again."
+            ),
+          }))
+        }
+      }
+
+      if (!mutationSucceeded) return
+
+      try {
+        const page = await fetchProfilePosts(handle)
+        if (version === requestVersion.current) {
+          setPosts(page.items)
+          setNextCursor(page.nextCursor)
+        }
+      } catch (refreshError) {
+        if (version === requestVersion.current) {
+          setRepostErrors((current) => ({
+            ...current,
+            [post.id]: getApiErrorMessage(
+              refreshError,
+              "Your repost changed, but the profile activity could not be refreshed."
+            ),
+          }))
+        }
+      }
+    } finally {
+      interactionMutations.current.delete(post.id)
+      setPendingRepostIds((current) => {
         const next = new Set(current)
         next.delete(post.id)
         return next
@@ -348,15 +450,18 @@ export function ProfileView({
           <div className="space-y-4">
             {posts.map((post) => (
               <PostCard
-                key={post.id}
+                key={post.timelineEntryId}
                 post={post}
                 sessionAccount={sessionAccount}
                 likePending={pendingLikeIds.has(post.id)}
                 likeError={likeErrors[post.id] ?? null}
+                repostPending={pendingRepostIds.has(post.id)}
+                repostError={repostErrors[post.id] ?? null}
                 onAuthRequest={onAuthRequest}
                 onNavigateProfile={onNavigateProfile}
                 onReplyCreated={handleReplyCreated}
                 onToggleLike={handleToggleLike}
+                onToggleRepost={handleToggleRepost}
               />
             ))}
           </div>

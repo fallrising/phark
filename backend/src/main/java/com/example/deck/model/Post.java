@@ -11,4 +11,10 @@ public record Post(
         Instant createdAt,
         long replyCount,
         long likeCount,
-        boolean likedByViewer) {}
+        boolean likedByViewer,
+        String timelineEntryId,
+        long repostCount,
+        boolean repostedByViewer,
+        String repostedBy,
+        String repostedByHandle,
+        Instant repostedAt) {}

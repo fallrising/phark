@@ -1,6 +1,6 @@
 # 架構與技術決策
 
-> 最後更新：2026-07-30
+> 最後更新：2026-09-02
 
 本專案目標是在**閒置 VPS** 上建立一條**單機、可重現、可回滾**的部署路徑，**不碰 Kubernetes**。
 
@@ -120,6 +120,47 @@ state；identity 只取自 `AccountPrincipal`。Timeline/profile 的 bounded que
 共享 `likeCount` 與 session 專屬 `likedByViewer`，response 標記
 `Cache-Control: private, no-store`。Frontend 先 optimistic toggle，再以 server state
 對齊；failure 只復原 like snapshot，不覆蓋同時發生的 reply 或其他 post 更新。
+
+V6 的 `post_reposts` 以 surrogate `id`（AUTOINCREMENT）作為 timeline activity identity，
+`(post_id, account_id)` UNIQUE constraint 保證每帳號對每原文只有一筆 repost relation，
+兩個 foreign keys 都使用 `ON DELETE CASCADE`。Repost/unrepost 使用
+`INSERT ... ON CONFLICT DO NOTHING`（冪等 PUT）與精確 DELETE（冪等 DELETE），在
+同一 transaction 讀回權威 `RepostState`（`postId`、`repostCount`、`repostedByViewer`）。
+Timeline/profile 的 mixed query 使用 `UNION ALL` 合併 original 與 repost branch，
+計算共享 `repostCount` 與 session 專屬 `repostedByViewer`；response 標記
+`Cache-Control: private, no-store`。
+
+Mixed timeline JSON 新增 activity identity、shared/viewer state 與 nullable attribution：
+
+```json
+{
+  "id": 42,
+  "timelineEntryId": "repost:17",
+  "repostCount": 3,
+  "repostedByViewer": false,
+  "repostedBy": "Bob",
+  "repostedByHandle": "bob_ops",
+  "repostedAt": "2026-08-09T12:00:00Z"
+}
+```
+
+- `id` 永遠是原文 ID；reply/like/repost mutation 都繼續使用這個 ID。
+- `timelineEntryId` 是 opaque stable key；original 格式 `post:{postId}`、repost
+  格式 `repost:{repostId}`，client 只比較相等與用作 dedup。
+- Original activity 的 `repostedBy`、`repostedByHandle`、`repostedAt` 都是 `null`。
+- Repost activity 的三個 attribution fields 都 non-null；原文 `author`、`authorHandle`、
+  `content`、`channel`、`createdAt` 不被轉發者覆蓋。
+
+Fan-out 規則：每個 original 保留一個 original activity（排序時間為原文 `createdAt`），
+每筆 repost relation 產生一個 repost activity（排序時間為 relation `createdAt`）。
+Profile posts 包含 owner originals 與 owner repost activities。排序固定為
+`activity_at DESC, entry_kind DESC, entry_id DESC`；同秒 tie-break 由 kind
+precedence（`POST > REPOST`）與 entry ID 決定。Mixed cursor 是 opaque、無 padding 的
+Base64URL v2 token；其 canonical payload 為 `2:<epoch>:<kind>:<entryId>`。Decoder
+仍接受 canonical legacy `<epoch>:<postId>` payload 的 Base64URL token，並將它解讀為
+original activity boundary。Frontend render key 與 load-more dedup 使用
+`timelineEntryId`；互動 patch（like/repost count/state）仍使用原文 `id` 讓所有
+visible copies 同步。
 
 HTTP session 是單 instance process memory，idle timeout 預設 30 分鐘；restart 或
 重新部署會登出所有使用者。這與 SQLite 的 replicas=1 限制一致，但不是 durable

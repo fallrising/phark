@@ -1,5 +1,5 @@
 import type { AccountProfile } from "@/api/accounts"
-import { Heart } from "lucide-react"
+import { Heart, Repeat2 } from "lucide-react"
 import { AuthorLink } from "@/components/AuthorLink"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,9 @@ interface PostCardProps {
   onNavigateProfile: (handle: string) => void
   onReplyCreated: (postId: number) => void
   onToggleLike: (post: Post) => Promise<void>
+  repostPending: boolean
+  repostError: string | null
+  onToggleRepost: (post: Post) => Promise<void>
 }
 
 function formatTimestamp(value: string): string {
@@ -33,7 +36,12 @@ export function PostCard({
   onNavigateProfile,
   onReplyCreated,
   onToggleLike,
+  repostPending,
+  repostError,
+  onToggleRepost,
 }: PostCardProps) {
+  const interactionBusy = likePending || repostPending
+
   return (
     <Card className="border-border/80 bg-card/95">
       <CardHeader>
@@ -45,28 +53,71 @@ export function PostCard({
             onNavigateProfile={onNavigateProfile}
           />
         </CardTitle>
-        <p className="text-xs text-muted-foreground">{formatTimestamp(post.createdAt)}</p>
+        <p className="text-xs text-muted-foreground">
+          {formatTimestamp(post.createdAt)}
+        </p>
+        {post.repostedByHandle !== null &&
+        post.repostedBy !== null &&
+        post.repostedAt !== null ? (
+          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Repeat2 className="size-3 shrink-0" />
+            <AuthorLink
+              author={post.repostedBy}
+              handle={post.repostedByHandle}
+              className="hover:text-primary hover:underline"
+              onNavigateProfile={onNavigateProfile}
+            />
+            <span aria-hidden="true">·</span>
+            <span>{formatTimestamp(post.repostedAt)}</span>
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">{post.content}</p>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed">
+          {post.content}
+        </p>
         <div className="space-y-2">
-          <Button
-            type="button"
-            variant={post.likedByViewer ? "default" : "outline"}
-            size="sm"
-            aria-pressed={post.likedByViewer}
-            aria-busy={likePending}
-            disabled={likePending}
-            onClick={() => void onToggleLike(post)}
-          >
-            <Heart
-              className={post.likedByViewer ? "size-4 fill-current" : "size-4"}
-            />
-            {post.likeCount} {post.likeCount === 1 ? "like" : "likes"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={post.likedByViewer ? "default" : "outline"}
+              size="sm"
+              aria-pressed={post.likedByViewer}
+              aria-busy={likePending}
+              disabled={interactionBusy}
+              onClick={() => void onToggleLike(post)}
+            >
+              <Heart
+                className={post.likedByViewer ? "size-4 fill-current" : "size-4"}
+              />
+              {post.likeCount} {post.likeCount === 1 ? "like" : "likes"}
+            </Button>
+            <Button
+              type="button"
+              variant={post.repostedByViewer ? "default" : "outline"}
+              size="sm"
+              aria-pressed={post.repostedByViewer}
+              aria-busy={repostPending}
+              disabled={interactionBusy}
+              onClick={() => void onToggleRepost(post)}
+            >
+              <Repeat2
+                className={
+                  post.repostedByViewer ? "size-4 fill-current" : "size-4"
+                }
+              />
+              {post.repostCount}{" "}
+              {post.repostCount === 1 ? "repost" : "reposts"}
+            </Button>
+          </div>
           {likeError ? (
             <p role="alert" className="text-xs text-destructive">
               {likeError}
+            </p>
+          ) : null}
+          {repostError ? (
+            <p role="alert" className="text-xs text-destructive">
+              {repostError}
             </p>
           ) : null}
         </div>
