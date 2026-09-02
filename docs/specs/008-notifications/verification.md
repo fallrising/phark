@@ -11,7 +11,9 @@
 | `7a93d19` | V7 migration、notification persistence/page projection 與 500-row retention |
 | `4472573` | Transactional reply/like/repost event emission 與 idempotency |
 | `7f6df3a` | Strict notification cursor、read-through、HTTP API 與 security/cache contract |
-| This checkpoint | Typed notification client、badge/session state、route、page 與 interactions |
+| `d6cfeb0` | Typed notification client、badge/session state、route、page 與 interactions |
+| `30690c8` | Notification API、architecture、migration runbook 與 roadmap 文件 |
+| This checkpoint | Production image、V6→V7 migration 與 full runtime delivery evidence |
 
 ## Inherited baseline
 
@@ -29,9 +31,9 @@
 | Notification cursor/read API/security tests | 通過 | 65 tests；0 failures、0 errors、0 skipped |
 | Complete backend regression | 通過（D checkpoint） | 257 tests；0 failures、0 errors、0 skipped |
 | Frontend lint/build | 通過 | oxlint、TypeScript 與 Vite production build；1,864 modules |
-| Multi-stage Docker build | 待執行 | F 階段 |
-| Production-like runtime smoke | 待執行 | F 階段 |
-| GitHub Actions delivery head | 待執行 | F 階段 |
+| Multi-stage Docker build | 通過 | 257 backend tests、frontend lint/build、non-root image `sha256:e5410cdd...cf487` |
+| Production-like runtime smoke | 通過 | clean/populated migration、two-viewer events、500-row retention、read/security/cache/SPA |
+| GitHub Actions delivery head | 待 final evidence head | `30690c8` CI run `33667490729` 已通過 |
 
 完成時記錄 exact commands、RED failures、test counts、image digest、runtime scenarios、workflow
 run/job URL 與 commit SHA；未實際執行的 gate 不標記為通過。
@@ -69,6 +71,7 @@ mvn -f backend/pom.xml -B test
 npm run lint
 npm run build
 docker build -t phark:sdd008 .
+bash -n /tmp/phark-sdd008-runtime.sh && /tmp/phark-sdd008-runtime.sh
 ```
 
 Host 若仍無 JDK，使用 repository Dockerfile 或 pinned Maven container；Node 沿用 repository
@@ -165,3 +168,61 @@ Host 若仍無 JDK，使用 repository Dockerfile 或 pinned Maven container；N
 - `npm run lint` → 通過。
 - `npm run build`（`tsc -b && vite build`）→ 通過；Vite 轉換 1,864 modules，產出 production assets。
 - Production browser/session behavior 尚需 F 階段 Docker runtime smoke，不以靜態 build 取代。
+
+## Production image checkpoint evidence
+
+- `docker build --progress=plain -t phark:sdd008 .` 通過：frontend `oxlint` 檢查 26 files，
+  0 warnings / 0 errors；TypeScript/Vite production build 轉換 1,864 modules；Maven 完整
+  backend suite 257 tests，0 failures / 0 errors / 0 skipped。
+- Build 內 migration suite 驗證 7 個 immutable migrations，包含 empty、populated
+  V3/V4/V5/V6 與 pre-Flyway legacy paths；populated V6 只套用 V7。
+- Production image ID：
+  `sha256:e5410cdd7947ab5ac37719e43138b4878a60515f1c8870750ddd9ed8383cf487`；
+  runtime user `10001:10001`，entrypoint `java -jar /app/app.jar`。
+
+## Production-like runtime checkpoint evidence
+
+Image `phark:sdd008` 以 `SPRING_PROFILES_ACTIVE=prod`、`SESSION_COOKIE_SECURE=false` 在
+loopback 上執行。驗證使用真實 Docker runtime、SQLite file、HTTP cookie jar 與 CSRF
+token，沒有以 mock 取代 production wiring。
+
+- Clean database：從 empty schema 套用 V1–V7，health `UP`；停止後
+  `PRAGMA integrity_check=ok`、latest version 7、9 筆 seed posts、0 notifications 與 0 read
+  states。Anonymous notification GET 回 `401 AUTHENTICATION_REQUIRED`；direct
+  `/notifications` 回 production SPA shell，bundle 含 Notifications UI 與 `99+` badge cap。
+- Populated upgrade：先以 `phark:sdd007`（image
+  `sha256:cd304bfca3f6e626af6c1afd116991d33ebfe12f60ad9c765ad2b18717110c56`）
+  產生真實 V6 database：2 accounts、10 posts、Bob-owned target post、Alice like/repost。
+  `phark:sdd008` 原地啟動後只套用 V7，health 回 `UP`、integrity `ok`；accounts/posts
+  counts 與 target post ID 保留，preexisting like/repost relations 仍存在，新 tables 為空，
+  `idx_notifications_recipient_page` 存在，證明 no-backfill。
+- Event lifecycle：V6 已存在 relation 的重送 PUT 不回填通知；Alice 先移除後對
+  Bob 原文 reply/like/repost，Bob 收到 ID-desc `REPOST, LIKE, REPLY`三筆，
+  `unreadCount=3`，Alice 為 0。重送 like/repost 不重複；Bob self 與 Alice 對
+  legacy owner-null 文章的三種互動都成功但不通知。
+- Cancellation：Alice unlike/unrepost 後舊三筆仍在；再 like/repost 後新增不同
+  IDs，Bob 共 5 筆未讀。
+- Cursor/read/security：`limit=2` 三頁精確讀完 5 筆，無重複，各頁 global
+  latest/unread 一致；notification GET 含 `Cache-Control: private, no-store`。缺 CSRF
+  的 read PUT 回 `403 CSRF_TOKEN_INVALID`，Bob 使用 Alice cursor 回
+  `400 INVALID_CURSOR`，兩條路徑後仍為 5 未讀。Bob 以 latest cursor 標記後
+  unread 為 0 且 items 皆 read，再送舊 cursor 時 read-through 仍為 `MTo1`。
+- Retention：以公開 unlike/like lifecycle 再產生 496 筆真實 events；Bob 原本 5 筆
+  加新事件共 501，production transaction prune 後分 5 頁精確遍歷 500 個唯一
+  IDs，最舊 Bob event 已刪除，`unreadCount=496`。Alice 的 1 筆通知不受影響；
+  停止後 database integrity 仍為 `ok`，Bob/Alice retained counts 為 500/1，read state
+  已持久化。
+- 第一次 populated harness 在容器間使用一般 host SQLite connection 做只讀檢查，
+  但該 connection 建立了 host-owned WAL/SHM，使下一個 UID 10001 container 以
+  `SQLITE_READONLY` 拒絕；這是 smoke harness 權限副作用，不是 migration failure。修正為
+  container 停止後使用 immutable read-only inspection，並從全新 temp directory 重跑上述
+  完整流程後通過。
+
+## GitHub delivery checkpoint evidence
+
+- 文件 checkpoint `30690c8faef84d192871efc21589be7e16916a19` 已 push 至 draft PR #8。
+- GitHub Actions CI run `33667490729` 的 `Build container image` job `100372708058`
+  通過；詳情 URL：
+  `https://github.com/fallrising/phark/actions/runs/33667490729/job/100372708058`。
+- 本 evidence checkpoint push 後仍需以 final head 再等同一 workflow 通過，才可將 PR
+  轉 ready 並 merge。

@@ -80,14 +80,14 @@
 
 ## F：文件與整合交付
 
-- [ ] **F.1 開發/營運文件**
-  - [ ] F.1.1 記錄 notifications/read API、event lifecycle 與 no-backfill contract。
-  - [ ] F.1.2 記錄 V7 upgrade/backup/rollback、retention、indexes 與 query constraints。
-  - [ ] F.1.3 更新 architecture、development、roadmap 與 SDD evidence。
-- [ ] **F.2 Production-like validation**
-  - [ ] F.2.1 Docker multi-stage build 與 clean/populated V6-to-V7 migration。
-  - [ ] F.2.2 Runtime 驗證 two-viewer 三事件、self/legacy/idempotency/retention。
-  - [ ] F.2.3 Runtime 驗證 pagination/unread/security/cache/badge/SPA route。
+- [x] **F.1 開發/營運文件**
+  - [x] F.1.1 記錄 notifications/read API、event lifecycle 與 no-backfill contract。
+  - [x] F.1.2 記錄 V7 upgrade/backup/rollback、retention、indexes 與 query constraints。
+  - [x] F.1.3 更新 architecture、development、roadmap 與 SDD evidence。
+- [x] **F.2 Production-like validation**
+  - [x] F.2.1 Docker multi-stage build 與 clean/populated V6-to-V7 migration。
+  - [x] F.2.2 Runtime 驗證 two-viewer 三事件、self/legacy/idempotency/retention。
+  - [x] F.2.3 Runtime 驗證 pagination/unread/security/cache/badge/SPA route。
 - [ ] **F.3 CI 與交付**
   - [ ] F.3.1 推送所有階段 commits 並維護 draft PR。
   - [ ] F.3.2 GitHub Actions final head 全綠。
