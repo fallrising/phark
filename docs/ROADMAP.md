@@ -32,9 +32,9 @@
   - [x] session authentication 與 CSRF
   - [x] author ownership、legacy compatibility 與 profile page
 - [~] **SDD-006 — Likes**
-  - [ ] idempotent like/unlike
-  - [ ] per-user uniqueness
-  - [ ] timeline optimistic update
+  - [x] idempotent like/unlike
+  - [x] per-user uniqueness
+  - [x] timeline optimistic update
 - [ ] **SDD-007 — Reposts**
   - [ ] repost/unrepost
   - [ ] original post attribution

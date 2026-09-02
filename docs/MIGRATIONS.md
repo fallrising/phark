@@ -1,7 +1,7 @@
 # Schema Migration Production Runbook
 
 > 適用於 deck 應用（`deck` Compose project），基於 Flyway + SQLite。
-> 最後更新：2026-07-30
+> 最後更新：2026-08-09
 
 ---
 
@@ -164,11 +164,17 @@ Runtime image 刻意不安裝 `sqlite3`；history 一律使用 host CLI 查詢�
 所有 migration 的 `success` 欄位應為 `1`。若版本號與預期不符，表示
 baseline 或 migration 順序有落差。
 
-SDD-005 release 的預期 latest version 是 V4 `add accounts and ownership`。V4 新增
+SDD-006 release 的預期 latest version 是 V5 `add post likes`。V4 新增
 `accounts`、nullable `posts.author_account_id`、nullable
 `replies.author_account_id` 與對應 indexes。升級 V3 或 legacy baseline 時不得依
 `author` 字串建立 account；所有既有 ownership 必須保持 `NULL`，既有 row、ID、
 timestamp 與 author snapshot 必須保留。
+
+V5 只新增 `post_likes`，其 composite primary key 是 `(post_id, account_id)`；兩個
+foreign keys 分別指向 posts/accounts 並使用 `ON DELETE CASCADE`。從 populated V4
+升級時 accounts、owned posts/replies、IDs 與 timestamps 都必須保留，且新 table
+必須為空。回滾 V5 application image 時仍需同時還原部署前 database backup；舊 image
+不認識 V5 schema，不能只切回 image 就宣稱 rollback 完成。
 
 ---
 
@@ -273,7 +279,7 @@ New image:    ghcr.io/fallrising/phark:sha-def456...
 Backup:       /opt/apps/deck/backups/deck-20260730T120000Z.db
 Integrity:    ok
 Container:    Up (healthy)
-Migration:    V1 ~ V4 success = 1
+Migration:    V1 ~ V5 success = 1
 Result:       SUCCESS / FAILED → restored to abc123...
 ```
 

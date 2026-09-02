@@ -11,7 +11,8 @@
 | `1530d45` | V5 migration、composite uniqueness 與 like persistence |
 | `7bac5ea` | Viewer-aware timeline/profile reads 與 private cache policy |
 | `e8f3abb` | Authenticated idempotent PUT/DELETE like API |
-| This checkpoint | Frontend optimistic interaction、reconcile 與 rollback |
+| `4411017` | Frontend optimistic interaction、reconcile 與 rollback |
+| This checkpoint | 開發/營運文件、production image 與 runtime smoke evidence |
 
 ## Required gates
 
@@ -22,8 +23,8 @@
 | Complete backend regression | 通過（mutation checkpoint） | 164 tests；0 failures、0 errors、0 skipped |
 | Frontend lint | 通過 | oxlint；0 warnings、0 errors、22 files |
 | Frontend production build | 通過 | TypeScript project build + Vite；1861 modules |
-| Multi-stage Docker build | Pending | — |
-| Production-like runtime smoke | Pending | — |
+| Multi-stage Docker build | 通過 | 164 backend tests；Vite 1861 modules；non-root production image |
+| Production-like runtime smoke | 通過 | Health、SPA、two-viewer like lifecycle、anonymous/CSRF/profile isolation |
 | GitHub Actions final head | Pending | — |
 
 完成時記錄 exact commands、test counts、image digest、runtime scenarios、workflow run/job URL
@@ -73,3 +74,27 @@
 - Production frontend target：`docker build --target frontend-build -t phark-sdd006-frontend-final .`
   → lint 0 warnings/errors；TypeScript/Vite build 通過；image
   `sha256:dd6e85445a9f28cdec75430685a510c123d595b820398d3c15054f3448f18ab0`。
+
+## Production image evidence
+
+- `docker build -t phark:sdd006 .` → multi-stage build 通過：frontend lint/build、
+  backend `mvn test package` 與 164 tests 全綠。
+- 同一 build 的 migration suite 從 empty database 套用 V1–V5，並在 populated V4
+  database 套用 V5；兩者都到 schema version 5 且既有資料保留。
+- Image：`sha256:f32b2042c043f2e6a191aeeed902defb89b77be8c0acc3437b123d2282f3760f`；
+  runtime user `10001:10001`。
+
+## Production-like runtime evidence
+
+Image `phark:sdd006` 以 `SPRING_PROFILES_ACTIVE=prod`、
+`SESSION_COOKIE_SECURE=false` 啟動於 loopback `18086`；測試後容器已停止，含 session
+與 CSRF token 的暫存檔已刪除。
+
+- Actuator health 回 `UP`；direct `/profiles/{handle}` 回 production SPA shell。
+- Alice 註冊、登入、建立文章後，重送兩次 PUT 都回 200、count 維持 1、viewer=true。
+- Bob 先看到 count 1/viewer=false；like 後 count 2/viewer=true；兩次 DELETE 都回 200，
+  count 維持 1/viewer=false。
+- Anonymous 帶有效 CSRF 的 PUT 回 401；Bob 缺 CSRF 的 PUT 回 403；拒絕後 count
+  仍為 1，證明沒有 mutation side effect。
+- Alice/Bob/anonymous timeline 與 Alice profile posts 都回一致 count；viewer state 依
+  session 隔離，viewer-aware GET 都有 `Cache-Control: private, no-store`。

@@ -80,15 +80,15 @@
 
 ## F：文件與整合交付
 
-- [ ] **F.1 開發/營運文件**
-  - [ ] F.1.1 記錄 like API、viewer-aware post fields 與 error contract。
-  - [ ] F.1.2 記錄 V5 upgrade/backup/rollback 與 query constraints。
-  - [ ] F.1.3 更新 architecture、development、roadmap 與 SDD evidence。
-- [ ] **F.2 Production-like validation**
-  - [ ] F.2.1 Docker multi-stage build 與 clean/V4-to-V5 migration。
-  - [ ] F.2.2 Runtime 驗證 register/login/like/idempotency/viewer isolation。
-  - [ ] F.2.3 Runtime 驗證 unlike/anonymous/CSRF/profile/SPA failure paths。
+- [x] **F.1 開發/營運文件**
+  - [x] F.1.1 記錄 like API、viewer-aware post fields 與 error contract。
+  - [x] F.1.2 記錄 V5 upgrade/backup/rollback 與 query constraints。
+  - [x] F.1.3 更新 architecture、development、roadmap 與 SDD evidence。
+- [x] **F.2 Production-like validation**
+  - [x] F.2.1 Docker multi-stage build 與 clean/V4-to-V5 migration。
+  - [x] F.2.2 Runtime 驗證 register/login/like/idempotency/viewer isolation。
+  - [x] F.2.3 Runtime 驗證 unlike/anonymous/CSRF/profile/SPA failure paths。
 - [ ] **F.3 CI 與交付**
-  - [ ] F.3.1 推送所有階段 commits 並維護 draft PR。
+  - [x] F.3.1 推送所有階段 commits 並維護 draft PR。
   - [ ] F.3.2 GitHub Actions final head 全綠。
   - [ ] F.3.3 固化 verification evidence、完成 SDD-006 並 merge。
