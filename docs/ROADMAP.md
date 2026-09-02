@@ -39,10 +39,10 @@
   - [x] repost/unrepost
   - [x] original post attribution
   - [x] timeline fan-out 規則
-- [ ] **SDD-008 — Notifications**
-  - [ ] reply/like/repost events
-  - [ ] unread cursor
-  - [ ] retention policy
+- [x] **SDD-008 — Notifications**
+  - [x] reply/like/repost events
+  - [x] unread cursor
+  - [x] retention policy
 
 ## P2：探索與營運
 

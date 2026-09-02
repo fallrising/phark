@@ -52,6 +52,8 @@ curl -fsS http://localhost:8080/actuator/health
 | DELETE | `/api/posts/{postId}/repost` | 冪等取消轉發（需登入與 CSRF） |
 | GET | `/api/posts/{postId}/replies?limit=20&after=...` | 正序讀取回覆 |
 | POST | `/api/posts/{postId}/replies` | 以 session identity 建立單層回覆 |
+| GET | `/api/notifications?limit=20&before=...` | 已登入收件者的通知分頁（需登入） |
+| PUT | `/api/notifications/read` | 將通知標為已讀（需登入與 CSRF） |
 | GET | `/api/profiles/{handle}` | 公開 profile |
 | PATCH | `/api/profiles/me` | 修改自己的 display name/bio |
 | GET | `/api/profiles/{handle}/posts` | 該帳號的 cursor-paginated original/repost activities |
@@ -64,6 +66,13 @@ curl -fsS http://localhost:8080/actuator/health
 與 `repostedByViewer=false`。轉發 activity 包含 nullable 的 `repostedBy`、
 `repostedByHandle`、`repostedAt` attribution；original activity 的 attribution
 為 null。每個 item 都有 non-null `timelineEntryId` 作為 stable opaque dedup key。
+
+通知端點需要 authenticated session：`GET /api/notifications` 回傳目前收件者的
+通知分頁 `{ "items": [...], "nextCursor": ..., "latestCursor": ...,
+"readThroughCursor": ..., "unreadCount": ... }`，固定依 notification ID 倒序、
+`limit` 允許 `1..100`；`PUT /api/notifications/read` 以 monotonic high-water
+cursor 將通知標為已讀。Header 的 unread badge 只在 `unreadCount > 0` 顯示（上限
+`99+`），`/notifications` route 提供逐頁載入與「全部標為已讀」。
 
 每個 response 都包含 `X-Request-ID`。API 錯誤使用
 `application/problem+json`（RFC 9457），以穩定的 `code` 供程式判斷，並在 body
@@ -101,4 +110,5 @@ Browser client 啟動時先並行取得 CSRF token 與 session，所有 `POST`�
 - [x] Session accounts、可信作者歸屬與公開 profiles
 - [x] Per-account 冪等 likes 與 optimistic UI
 - [x] Per-account 冪等 reposts、original attribution 與 mixed timeline fan-out
+- [x] Per-account 通知中心與 unread badge
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）

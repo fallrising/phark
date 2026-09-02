@@ -13,18 +13,18 @@ phark/
 │       │   ├── java/com/example/deck/
 │       │   │   ├── DeckApplication.java
 │       │   │   ├── config/       # Database, migration, security 與 SPA config
-│       │   │   ├── controller/   # Auth、account、profile、post、reply、like、repost APIs
+│       │   │   ├── controller/   # Auth、account、profile、post、reply、like、repost、notifications APIs
 │       │   │   ├── dto/          # JSON request/response boundaries
 │       │   │   ├── error/        # RFC 9457 codes、exception mapper、violations
-│       │   │   ├── model/        # Account、profile、content、RepostState 與 page contracts
-│       │   │   ├── repository/   # Account/Post/Reply/PostLike/PostRepost JdbcClient repositories
+│       │   │   ├── model/        # Account、profile、content、RepostState、NotificationPage/ReadState 契約
+│       │   │   ├── repository/   # Account/Post/Reply/PostLike/PostRepost/Notification JdbcClient repositories
 │       │   │   ├── security/     # Principal、UserDetails 與 Problem writers
-│       │   │   ├── service/      # Account、Post、Reply、PostLike、PostRepost services
+│       │   │   ├── service/      # Account、Post、Reply、PostLike、PostRepost、Notification services
 │       │   │   └── web/          # Request correlation filter
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       ├── application-prod.properties
-│       │       └── db/migration/  # Immutable Flyway V1...V6
+│       │       └── db/migration/  # Immutable Flyway V1...V7
 │       └── test/
 ├── frontend/                # React + TypeScript + Vite + shadcn/ui
 │   ├── package.json
@@ -34,7 +34,8 @@ phark/
 │       ├── api/client.ts    # Problem Details、same-origin fetch、CSRF memory
 │       ├── api/accounts.ts  # Account/session/profile typed calls
 │       ├── api/posts.ts     # Post/reply/like/repost typed calls
-│       ├── components/      # Auth、profile、timeline、composer、ui/*
+│       ├── api/notifications.ts # Notification page/read typed calls
+│       ├── components/      # Auth、profile、timeline、composer、notifications、ui/*
 │       ├── lib/postReposts.ts  # repost snapshot/optimistic/rollback pure helpers
 │       └── types/post.ts
 ├── Dockerfile               # multi-stage build
@@ -59,6 +60,7 @@ phark/
 | Profile | 公開 profile、作者文章分頁與 owner display name/bio 編輯 |
 | Likes | 每帳號冪等 like/unlike、權威 count 與 optimistic rollback |
 | Reposts | 每帳號冪等 repost/unrepost、original attribution 與 mixed timeline fan-out |
+| Notifications | reply/like/repost 事件、unread badge、通知分頁與「全部標為已讀」 |
 | 自動刷新 | 發文後三欄自動重新載入 |
 
 ## REST API
@@ -227,6 +229,92 @@ Timeline 與 profile-post GET 的 `repostCount` 對所有 viewer 相同；
 `repostedByViewer` 依目前 session 計算，anonymous 固定為 false。這兩種 response 使用
 `Cache-Control: private, no-store`，不可放進共享 cache。
 
+### `GET /api/notifications`
+
+需 authenticated session。回傳目前收件者的 `NotificationPage`，固定依
+`notification.id DESC` 排序、`limit` 預設 20、範圍 1–100，以 `limit + 1` keyset
+pagination：
+
+```http
+GET /api/notifications?limit=20&before=<opaque-cursor>
+```
+
+```json
+{
+  "items": [
+    {
+      "id": 91,
+      "type": "REPLY",
+      "actor": "Alice",
+      "actorHandle": "alice_ops",
+      "postId": 42,
+      "postContent": "Ship the boring fix first.",
+      "replyId": 12,
+      "replyContent": "Agreed.",
+      "createdAt": "2026-09-02T10:00:00Z",
+      "read": false
+    }
+  ],
+  "nextCursor": null,
+  "latestCursor": "MTo5MQ",
+  "readThroughCursor": null,
+  "unreadCount": 1
+}
+```
+
+- `nextCursor` 非 null 時作為下一頁的 `before`；`before` 使用 strict `id < decodedId`，
+  cursor 只是 opaque ordering boundary，response 仍只查 principal recipient。
+- `latestCursor` 是目前最新 retained item 的 cursor，與目前 page 的 `before` 無關；
+  沒有通知時為 null。
+- `readThroughCursor` 是已保存 high-water ID 的 opaque encoding；尚未讀取時為 null。
+- `unreadCount` 只計算 retained rows 中 `id > readThroughId` 的數量；每個 item 的
+  `read` 等同 `id <= readThroughId`。
+- `postContent` 是目前原文內容；`replyContent` 只在 `REPLY` non-null。
+- Response 一律 `Cache-Control: private, no-store`；anonymous 回
+  `401 AUTHENTICATION_REQUIRED`。無效 `limit` 回 `INVALID_LIMIT`，無效 cursor 回
+  `INVALID_CURSOR`。
+
+### `PUT /api/notifications/read`
+
+需 authenticated session 與有效 CSRF。把 read high-water 推進到指定 retained 通知：
+
+```http
+PUT /api/notifications/read
+
+{ "through": "MTo5MQ" }
+```
+
+```json
+{ "readThroughCursor": "MTo5MQ", "unreadCount": 0 }
+```
+
+- `through` 必須 decode 成該收件者目前仍 retained 且 owned 的通知；其他帳號、已
+  prune、malformed 或 non-canonical cursor 回 `400 INVALID_CURSOR`，read state 不變。
+- 更新使用 `max(currentReadThroughId, requestedId)`，較舊的有效 cursor 不會讓已讀
+  狀態倒退。
+- Anonymous 回 `401 AUTHENTICATION_REQUIRED`；缺 CSRF 或 token 無效回
+  `403 CSRF_TOKEN_INVALID`，且不得改變 read state。
+
+### Notifications 事件寫入與 retention
+
+Notification 不另外建立 event bus：reply、like、repost 的來源 mutation 與
+notification insert/prune 在同一個 `@Transactional` service（ReplyService 已補上
+transaction；like/repost service 沿用原有 transaction boundary）。Event 只在來源
+mutation 確實建立新 row 時產生：
+
+- REPLY：reply row 建立後，依原文 `author_account_id` 產生事件；self reply 與 owner
+  為 null 的 legacy 文章跳過。
+- LIKE / REPOST：repository insert 回傳是否真的建立 relation（`ON CONFLICT DO
+  NOTHING`），冪等重送的 PUT 不會再產生通知。
+- Self interaction 與 owner 為 null 的 legacy 文章一律不產生事件。
+- Unlike/unrepost 只移除 relation，不撤回歷史事件；其後新的 PUT 是新的
+  interaction，產生新的 event 與新的 notification ID。
+
+每次成功建立通知後，同一 transaction 刪除該收件者第 501 筆及更舊 rows，只保留
+最新 500 筆（`idx_notifications_recipient_page (recipient_account_id, id DESC)`）。
+Prune 不重寫 ID 也不降低 `readThroughId`；已刪除的 ID 仍可作為較新事件的比較
+boundary。V7 不回填既有 interactions，首次部署後通知從 0 筆開始。
+
 ### 帳號、Session 與 CSRF
 
 | Method | Path | Auth | 說明 |
@@ -304,7 +392,7 @@ members 必須忽略。
 | `VALIDATION_FAILED` | 400 | request body 欄位 constraint 失敗 |
 | `INVALID_CHANNEL` | 400 | channel 不在允許清單 |
 | `INVALID_LIMIT` | 400 | limit 不是整數或不在 1–100 |
-| `INVALID_CURSOR` | 400 | timeline/replies cursor 不合法 |
+| `INVALID_CURSOR` | 400 | timeline/replies/notifications cursor 不合法 |
 | `INVALID_POST_ID` | 400 | post ID 不是正整數 |
 | `MALFORMED_REQUEST` | 400 | request body 缺失、語法錯誤或無法讀取 |
 | `INVALID_CREDENTIALS` | 401 | 登入失敗；不區分 handle 或 password 原因 |
@@ -349,6 +437,21 @@ Request ID 只用於關聯 response 與 server log，不是 authentication 或�
 - Repost success 後重新載入權威 first page，新增或移除 actor activity；不以 client
   clock 偽造 `repostedAt`。Stale request version 不可覆蓋較新的 identity/feed load。
 - Anonymous 不送 request；顯示登入 feedback。
+
+### Frontend Notifications
+
+- `AccountControls` 在 authenticated controls 提供 Notifications link/button；只有
+  `unreadCount > 0` 才顯示 accessible badge，顯示值最高 `99+`。
+- App 提供 `/notifications` client route；anonymous viewer 使用既有的 sign-in
+  feedback，不發送 notification request。
+- Session identity 載入或切換帳號成功後讀第一頁取得 badge；logout 立即清空
+  notification state，避免跨帳號短暫洩漏。
+- `NotificationView` 以 notification ID render/dedup，保存 next/latest cursor，逐頁
+  append。
+- Mark-all-read 只在 latest cursor non-null 且有未讀時可按；成功後把目前已載入的所有
+  items 標為 read，並套用 server 回傳的 `readThroughCursor` 與 `unreadCount`；失敗時
+  不 optimistic clear，保留 badge 並顯示錯誤。
+- 本輪不 polling；進入通知頁、mark read 或 session identity 改變時才 refresh。
 
 ## 環境變數
 
@@ -467,7 +570,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 | 範圍 | 命令 | 覆蓋 |
 |------|------|------|
-| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content/likes/reposts、mixed timeline/cursor、migration、errors |
+| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content/likes/reposts、mixed timeline/cursor、notifications、migration、errors |
 | Frontend lint | `npm run lint`（在 `frontend/`） | oxlint |
 | Frontend build | `npm run build`（在 `frontend/`） | TypeScript + Vite |
 | 整合 | `docker build -t stream-deck .` | 含 frontend lint/build + Maven test |

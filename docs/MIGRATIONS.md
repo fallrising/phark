@@ -164,7 +164,9 @@ Runtime image 刻意不安裝 `sqlite3`；history 一律使用 host CLI 查詢�
 所有 migration 的 `success` 欄位應為 `1`。若版本號與預期不符，表示
 baseline 或 migration 順序有落差。
 
-SDD-007 release 的預期 latest version 是 V6 `add post reposts`。V4 新增
+SDD-007 release 的預期 latest version 是 V6 `add post reposts`。SDD-008
+（notifications）release 的預期 latest version 是 V7 `add notifications`，兩張新
+table 都不回填既有資料。V4 新增
 `accounts`、nullable `posts.author_account_id`、nullable
 `replies.author_account_id` 與對應 indexes。升級 V3 或 legacy baseline 時不得依
 `author` 字串建立 account；所有既有 ownership 必須保持 `NULL`，既有 row、ID、
@@ -186,6 +188,19 @@ created_at DESC, id DESC`）支援 profile feed。Mixed timeline query 使用 bo
 `UNION ALL` 合併 original 與 repost branch，最大 page size 為 100。回滾 V6
 application image 時仍需同時還原部署前 database backup；舊 image 不認識 V6 schema，
 不能只切回 image 就宣稱 rollback 完成。不手動 DELETE flyway_schema_history rows。
+
+V7 是 SDD-008（notifications）的 migration，新增 `notifications` 與
+`notification_read_state` 兩個 table。`notifications` 使用 AUTOINCREMENT `id`、
+`UNIQUE(reply_id)`、CHECK（REPLY 必有 reply_id，LIKE/REPOST 為 null）與 named
+index `idx_notifications_recipient_page (recipient_account_id, id DESC)`；
+actor/recipient/post/reply 都使用 `ON DELETE CASCADE` foreign keys。
+`notification_read_state` 以 `account_id` 為 primary key，保存 non-negative
+`read_through_id`，不 foreign-key 到 notifications，避免 retention 刪除 boundary
+row 時破壞 read state。V7 **不回填**任何既有 replies/likes/reposts，部署當下兩張新
+table 都為空；從 populated V6 升級時所有既有的 accounts、posts、replies、likes、
+reposts、IDs 與 timestamps 都必須保留，notification 資料只會從部署後的新互動開始
+累積。回滾 V7 application image 時仍需同時還原部署前 database backup；舊 image 不
+認識 V7 schema，不能只切回 image 就宣稱 rollback 完成。
 
 ---
 
