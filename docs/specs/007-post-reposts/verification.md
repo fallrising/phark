@@ -1,6 +1,6 @@
 # SDD-007 驗證紀錄
 
-> 狀態：In Progress
+> 狀態：Complete
 > Branch：`agent/reposts`
 
 ## Checkpoints
@@ -12,7 +12,8 @@
 | `fa828b9` | Versioned cursor、mixed timeline/profile reads 與 attribution |
 | `08f2853` | Authenticated PUT/DELETE repost API 與 security boundary |
 | `cecab85` | Frontend attribution、optimistic interaction 與 activity refresh |
-| This checkpoint | 開發/營運文件、production image 與 runtime smoke evidence |
+| `85b5a27` | 開發/營運文件、production image 與 runtime smoke evidence |
+| This checkpoint | Final SDD status、task tree、roadmap 與 CI evidence |
 
 ## Inherited baseline
 
@@ -36,7 +37,7 @@
 | Frontend production build | 通過 | TypeScript + Vite；1,862 modules transformed |
 | Multi-stage Docker build | 通過 | 201 tests；non-root image `sha256:cd304bfc...10c56` |
 | Production-like runtime smoke | 通過 | clean/populated migration、two-viewer repost、cursor/security/profile/SPA |
-| GitHub Actions final head | Pending | — |
+| GitHub Actions delivery head | 通過 | CI run `33654530427`；Build container image job 通過 |
 
 完成時記錄 exact commands、RED failures、test counts、image digest、runtime scenarios、
 workflow run/job URL 與 commit SHA；未實際執行的 gate 不標記為通過。
@@ -184,3 +185,14 @@ database directories 與只含測試密碼的 smoke script 都已移除。
 - Alice 連續 DELETE 後 count 0、timeline 只剩 original、Alice profile activity 消失；
   再 PUT 產生新 activity key `repost:4`，不同於第一次的 `repost:1`。
 - Direct `/profiles/alice007` 回 production SPA HTML shell。
+
+## GitHub delivery evidence
+
+- Delivery evidence commit：`85b5a27351ed9b32c437857fa9c0e3096b313023`。
+- CI workflow run：
+  `https://github.com/fallrising/phark/actions/runs/33654530427` → success。
+- `Build container image` job：
+  `https://github.com/fallrising/phark/actions/runs/33654530427/job/100329653976` → success，
+  1m05s。
+- Draft PR：`https://github.com/fallrising/phark/pull/7`；final documentation head 仍須以
+  同一 CI workflow 通過後才轉 ready 與 merge。
