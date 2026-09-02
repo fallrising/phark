@@ -1,6 +1,6 @@
 # SDD-008 驗證紀錄
 
-> 狀態：In Progress
+> 狀態：Complete
 > Branch：`agent/notifications`
 
 ## Checkpoints
@@ -13,7 +13,8 @@
 | `7f6df3a` | Strict notification cursor、read-through、HTTP API 與 security/cache contract |
 | `d6cfeb0` | Typed notification client、badge/session state、route、page 與 interactions |
 | `30690c8` | Notification API、architecture、migration runbook 與 roadmap 文件 |
-| This checkpoint | Production image、V6→V7 migration 與 full runtime delivery evidence |
+| `e37d97f` | Production image、V6→V7 migration 與 full runtime delivery evidence |
+| This checkpoint | Final SDD status、54/54 孫任務、CI evidence 與 merge gate |
 
 ## Inherited baseline
 
@@ -29,11 +30,11 @@
 | V7 migration/repository tests | 通過 | 11 tests；0 failures、0 errors、0 skipped |
 | Transactional event emission tests | 通過 | 57 focused tests；0 failures、0 errors、0 skipped |
 | Notification cursor/read API/security tests | 通過 | 65 tests；0 failures、0 errors、0 skipped |
-| Complete backend regression | 通過（D checkpoint） | 257 tests；0 failures、0 errors、0 skipped |
-| Frontend lint/build | 通過 | oxlint、TypeScript 與 Vite production build；1,864 modules |
+| Complete backend regression | 通過（production image） | 257 tests；0 failures、0 errors、0 skipped |
+| Frontend lint/build | 通過（production image） | oxlint 0 diagnostics、TypeScript/Vite；1,864 modules |
 | Multi-stage Docker build | 通過 | 257 backend tests、frontend lint/build、non-root image `sha256:e5410cdd...cf487` |
 | Production-like runtime smoke | 通過 | clean/populated migration、two-viewer events、500-row retention、read/security/cache/SPA |
-| GitHub Actions delivery head | 待 final evidence head | `30690c8` CI run `33667490729` 已通過 |
+| GitHub Actions delivery head | 通過 | `e37d97f` CI run `33668734684`；job `100376785263` |
 
 完成時記錄 exact commands、RED failures、test counts、image digest、runtime scenarios、workflow
 run/job URL 與 commit SHA；未實際執行的 gate 不標記為通過。
@@ -220,9 +221,10 @@ token，沒有以 mock 取代 production wiring。
 
 ## GitHub delivery checkpoint evidence
 
-- 文件 checkpoint `30690c8faef84d192871efc21589be7e16916a19` 已 push 至 draft PR #8。
-- GitHub Actions CI run `33667490729` 的 `Build container image` job `100372708058`
-  通過；詳情 URL：
-  `https://github.com/fallrising/phark/actions/runs/33667490729/job/100372708058`。
-- 本 evidence checkpoint push 後仍需以 final head 再等同一 workflow 通過，才可將 PR
-  轉 ready 並 merge。
+- Runtime evidence checkpoint `e37d97f821e34152831f827dee8668993f667c31` 已 push 至
+  draft PR #8，所有前置 stages 也保持獨立 commits。
+- GitHub Actions CI run `33668734684` 在該 head 通過；`Build container image` job
+  `100376785263` 於 1m11s 完成。詳情 URL：
+  `https://github.com/fallrising/phark/actions/runs/33668734684/job/100376785263`。
+- 本 completion checkpoint 只固化狀態、任務與上述已通過 evidence；push 後仍必須
+  等 PR head 自身的同一 CI workflow 通過，才將 PR 轉 ready 並 merge。
