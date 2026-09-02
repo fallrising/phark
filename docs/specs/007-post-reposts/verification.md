@@ -9,7 +9,8 @@
 |--------|------|
 | `ddf78de` | Spec、design、風險與 54 項孫任務 |
 | `0b1372c` | V6 migration、repost relation persistence 與 upgrade evidence |
-| This checkpoint | Versioned cursor、mixed timeline/profile reads 與 attribution |
+| `fa828b9` | Versioned cursor、mixed timeline/profile reads 與 attribution |
+| This checkpoint | Authenticated PUT/DELETE repost API 與 security boundary |
 
 ## Inherited baseline
 
@@ -27,8 +28,8 @@
 |------|------|------|
 | V6 migration/repository tests | 通過 | 11 tests；0 failures、0 errors、0 skipped |
 | Mixed cursor/timeline/profile tests | 通過 | 55 focused tests；0 failures、0 errors、0 skipped |
-| Repost API/security tests | Pending | — |
-| Complete backend regression | 通過（read checkpoint） | 189 tests；0 failures、0 errors、0 skipped |
+| Repost API/security tests | 通過 | 26 focused tests；0 failures、0 errors、0 skipped |
+| Complete backend regression | 通過（API checkpoint） | 201 tests；0 failures、0 errors、0 skipped |
 | Frontend lint | Pending | — |
 | Frontend production build | Pending | — |
 | Multi-stage Docker build | Pending | — |
@@ -104,4 +105,20 @@ Host 若仍無 JDK/Node，使用 repository Dockerfile 或 pinned Maven/Node con
   `mvn -f backend/pom.xml -B -Dtest=PostCursorCodecTest,PostRepostReadContractTest,PostLikeReadContractTest,PostRepositoryTest,PostControllerTest test`
   → 55 tests 通過。
 - Regression：`mvn -f backend/pom.xml -B test` → 189 tests 通過。
+- Host 無 JDK；以上 Maven commands 在 `maven:3.9-eclipse-temurin-17` container 執行。
+
+## Mutation API checkpoint evidence
+
+- RED：`PostRepostMutationContractTest` 可編譯並執行 12 tests；10 個因 route 不存在而以
+  generic 404 如預期失敗，anonymous/authenticated missing-CSRF 兩例先由既有 filter 通過。
+- Review refactor：在 GREEN 前修正 DELETE 後才查已刪 relation ID、JSON camelCase 欄位，
+  並把重送 timestamp 測試固定到舊時間，避免同秒 false positive。
+- GREEN：新增 transactional `PostRepostService` 與 PUT/DELETE controller；positive missing、
+  non-positive、self/legacy、spoofed body 與 authoritative readback 共用既有 error boundary。
+- SecurityConfig 明確要求 PUT/DELETE `/api/posts/*/repost` authenticated；actor 只取自
+  `AccountPrincipal`，CSRF 仍在 controller 前拒絕且資料無副作用。
+- Focused：
+  `mvn -f backend/pom.xml -B -Dtest=PostRepostMutationContractTest,AuthSecurityContractTest test`
+  → 26 tests 通過（12 mutation + 14 security）。
+- Regression：`mvn -f backend/pom.xml -B test` → 201 tests 通過。
 - Host 無 JDK；以上 Maven commands 在 `maven:3.9-eclipse-temurin-17` container 執行。

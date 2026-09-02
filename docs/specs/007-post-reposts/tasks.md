@@ -50,18 +50,18 @@
 
 ## D：Authenticated repost API
 
-- [ ] **D.1 RED — Mutation contract**
-  - [ ] D.1.1 測試 repost/unrepost lifecycle、重送與 authoritative response。
-  - [ ] D.1.2 測試 invalid/missing/self/legacy post 與 actor identity boundary。
-  - [ ] D.1.3 測試 anonymous/CSRF 拒絕且 relation/timeline 無副作用。
-- [ ] **D.2 GREEN — API/service wiring**
-  - [ ] D.2.1 實作 transactional service 與 PUT/DELETE controller。
-  - [ ] D.2.2 明確保護 repost routes 並只信任 authenticated principal。
-  - [ ] D.2.3 對齊既有 validation、Problem Details 與 request ID。
-- [ ] **D.3 GREEN/REFACTOR — Mutation regressions**
-  - [ ] D.3.1 驗證兩 actor interleaving 與 DELETE 只移除 actor activity。
-  - [ ] D.3.2 驗證 mutation 不改原文 timestamp/content/likes/replies。
-  - [ ] D.3.3 執行 focused security/API 與完整 backend suite。
+- [x] **D.1 RED — Mutation contract**
+  - [x] D.1.1 測試 repost/unrepost lifecycle、重送與 authoritative response。
+  - [x] D.1.2 測試 invalid/missing/self/legacy post 與 actor identity boundary。
+  - [x] D.1.3 測試 anonymous/CSRF 拒絕且 relation/timeline 無副作用。
+- [x] **D.2 GREEN — API/service wiring**
+  - [x] D.2.1 實作 transactional service 與 PUT/DELETE controller。
+  - [x] D.2.2 明確保護 repost routes 並只信任 authenticated principal。
+  - [x] D.2.3 對齊既有 validation、Problem Details 與 request ID。
+- [x] **D.3 GREEN/REFACTOR — Mutation regressions**
+  - [x] D.3.1 驗證兩 actor interleaving 與 DELETE 只移除 actor activity。
+  - [x] D.3.2 驗證 mutation 不改原文 timestamp/content/likes/replies。
+  - [x] D.3.3 執行 focused security/API 與完整 backend suite。
 
 ## E：Frontend repost experience
 
