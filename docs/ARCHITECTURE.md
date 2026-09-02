@@ -113,6 +113,14 @@ V4 的 `posts.author_account_id`、`replies.author_account_id` 是 nullable FK�
 read 以 account 的目前 display name 為優先。V1–V3 legacy rows 不回填、不認領，
 仍以原始 `author` snapshot 顯示。
 
+V5 的 `post_likes` 以 `(post_id, account_id)` composite primary key 保證每個帳號對
+每篇文章只有一筆 relation，兩個 foreign keys 都使用 `ON DELETE CASCADE`。Like/unlike
+使用 conflict-safe insert/精確 delete，在同一 transaction 讀回權威 count 與 viewer
+state；identity 只取自 `AccountPrincipal`。Timeline/profile 的 bounded query 同時計算
+共享 `likeCount` 與 session 專屬 `likedByViewer`，response 標記
+`Cache-Control: private, no-store`。Frontend 先 optimistic toggle，再以 server state
+對齊；failure 只復原 like snapshot，不覆蓋同時發生的 reply 或其他 post 更新。
+
 HTTP session 是單 instance process memory，idle timeout 預設 30 分鐘；restart 或
 重新部署會登出所有使用者。這與 SQLite 的 replicas=1 限制一致，但不是 durable
 login。需要水平擴展時，shared session store 與 PostgreSQL 必須一起重新評估。

@@ -7,6 +7,7 @@ import com.example.deck.model.Post;
 import com.example.deck.model.PostPage;
 import com.example.deck.security.AccountPrincipal;
 import com.example.deck.service.PostService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,8 +33,12 @@ public class PostController {
     public PostPage getPosts(
             @RequestParam(required = false) String channel,
             @RequestParam(defaultValue = "20") int limit,
-            @RequestParam(required = false) String before) {
-        return postService.getPosts(channel, limit, before);
+            @RequestParam(required = false) String before,
+            @AuthenticationPrincipal AccountPrincipal principal,
+            HttpServletResponse response) {
+        response.setHeader("Cache-Control", "private, no-store");
+        Long viewerAccountId = principal == null ? null : principal.getAccountId();
+        return postService.getPosts(channel, limit, before, viewerAccountId);
     }
 
     @PostMapping

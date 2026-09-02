@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
+import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,21 +40,27 @@ class SchemaMigrationConfigTest {
     }
 
     private void runMigration() {
+        runMigration(null);
+    }
+
+    private void runMigration(String target) {
         try (HikariDataSource dataSource = new HikariDataSource()) {
             dataSource.setJdbcUrl(url);
             dataSource.setDriverClassName("org.sqlite.JDBC");
             dataSource.setMaximumPoolSize(1);
 
-            Flyway flyway = Flyway.configure()
+            FluentConfiguration configuration = Flyway.configure()
                     .dataSource(dataSource)
                     .locations("classpath:db/migration")
                     .baselineVersion("1")
                     .validateOnMigrate(true)
                     .validateMigrationNaming(true)
-                    .cleanDisabled(true)
-                    .load();
+                    .cleanDisabled(true);
+            if (target != null) {
+                configuration.target(target);
+            }
 
-            new SchemaMigrationConfig().guardedLegacyBaseline().migrate(flyway);
+            new SchemaMigrationConfig().guardedLegacyBaseline().migrate(configuration.load());
         }
     }
 
@@ -145,21 +152,37 @@ class SchemaMigrationConfigTest {
         return false;
     }
 
+    private int primaryKeyOrder(String table, String column) throws Exception {
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equals(rs.getString("name"))) {
+                    return rs.getInt("pk");
+                }
+            }
+        }
+        throw new AssertionError("Missing column " + table + "." + column);
+    }
+
     @Test
-    void emptyDatabaseBootstrapsV1ThroughV4() throws Exception {
+    void emptyDatabaseBootstrapsV1ThroughV5() throws Exception {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(4);
+        assertThat(history).hasSize(5);
         assertThat(history.get(0)).containsExactly("1", "SQL", "V1__create_legacy_posts.sql", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
         assertThat(history.get(3))
                 .containsExactly("4", "SQL", "V4__add_accounts_and_ownership.sql", "1");
+        assertThat(history.get(4))
+                .containsExactly("5", "SQL", "V5__add_post_likes.sql", "1");
 
         assertThat(tableExists("posts")).isTrue();
         assertThat(tableExists("replies")).isTrue();
         assertThat(tableExists("accounts")).isTrue();
+        assertThat(tableExists("post_likes")).isTrue();
         assertThat(tableExists("flyway_schema_history")).isTrue();
 
         assertThat(columnExists("accounts", "id")).isTrue();
@@ -173,6 +196,12 @@ class SchemaMigrationConfigTest {
         assertThat(columnExists("replies", "author_account_id")).isTrue();
         assertThat(columnIsNullable("posts", "author_account_id")).isTrue();
         assertThat(columnIsNullable("replies", "author_account_id")).isTrue();
+        assertThat(columnIsNullable("post_likes", "post_id")).isFalse();
+        assertThat(columnIsNullable("post_likes", "account_id")).isFalse();
+        assertThat(columnExists("post_likes", "created_at")).isTrue();
+        assertThat(primaryKeyOrder("post_likes", "post_id")).isEqualTo(1);
+        assertThat(primaryKeyOrder("post_likes", "account_id")).isEqualTo(2);
+        assertThat(primaryKeyOrder("post_likes", "created_at")).isZero();
 
         assertThat(indexExists("idx_posts_timeline")).isTrue();
         assertThat(indexExists("idx_posts_channel_timeline")).isTrue();
@@ -182,6 +211,8 @@ class SchemaMigrationConfigTest {
 
         assertThat(fkExists("posts", "author_account_id", "accounts", "SET NULL")).isTrue();
         assertThat(fkExists("replies", "author_account_id", "accounts", "SET NULL")).isTrue();
+        assertThat(fkExists("post_likes", "post_id", "posts", "CASCADE")).isTrue();
+        assertThat(fkExists("post_likes", "account_id", "accounts", "CASCADE")).isTrue();
 
         assertThat(indexExists("idx_posts_author_timeline")).isTrue();
         assertThat(indexExists("idx_replies_author")).isTrue();
@@ -204,6 +235,7 @@ class SchemaMigrationConfigTest {
             assertThat(rs.next()).isTrue();
             assertThat(rs.getInt(1)).isZero();
         }
+        assertThat(queryLong("SELECT COUNT(*) FROM post_likes")).isZero();
     }
 
     @Test
@@ -217,12 +249,14 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(4);
+        assertThat(history).hasSize(5);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
         assertThat(history.get(3))
                 .containsExactly("4", "SQL", "V4__add_accounts_and_ownership.sql", "1");
+        assertThat(history.get(4))
+                .containsExactly("5", "SQL", "V5__add_post_likes.sql", "1");
 
         try (Connection conn = DriverManager.getConnection(url);
                 Statement stmt = conn.createStatement();
@@ -246,6 +280,8 @@ class SchemaMigrationConfigTest {
         assertThat(indexExists("idx_replies_post_timeline")).isTrue();
         assertThat(tableExists("replies")).isTrue();
         assertThat(tableExists("accounts")).isTrue();
+        assertThat(tableExists("post_likes")).isTrue();
+        assertThat(queryLong("SELECT COUNT(*) FROM post_likes")).isZero();
 
         execute("INSERT INTO posts (author, content, channel) VALUES ('next', 'after migration', 'home')");
         assertThat(queryLong("SELECT MAX(id) FROM posts")).isEqualTo(42);
@@ -265,12 +301,14 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(4);
+        assertThat(history).hasSize(5);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
         assertThat(history.get(3))
                 .containsExactly("4", "SQL", "V4__add_accounts_and_ownership.sql", "1");
+        assertThat(history.get(4))
+                .containsExactly("5", "SQL", "V5__add_post_likes.sql", "1");
 
         try (Connection conn = DriverManager.getConnection(url);
                 Statement stmt = conn.createStatement();
@@ -306,12 +344,34 @@ class SchemaMigrationConfigTest {
         assertThat(indexExists("idx_posts_channel_timeline")).isTrue();
         assertThat(indexExists("idx_replies_post_timeline")).isTrue();
         assertThat(tableExists("accounts")).isTrue();
+        assertThat(tableExists("post_likes")).isTrue();
+        assertThat(queryLong("SELECT COUNT(*) FROM post_likes")).isZero();
 
         execute(
                 "INSERT INTO posts (author, content, channel) VALUES ('next', 'after migration', 'tech')",
                 "INSERT INTO replies (post_id, author, content) VALUES (41, 'next', 'after migration')");
         assertThat(queryLong("SELECT MAX(id) FROM posts")).isEqualTo(42);
         assertThat(queryLong("SELECT MAX(id) FROM replies")).isEqualTo(18);
+    }
+
+    @Test
+    void v4DatabaseUpgradesToV5PreservingAccountsAndOwnedContent() throws Exception {
+        runMigration("4");
+        execute(
+                "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-03-04 05:06:07', '2024-03-04 05:06:07')",
+                "INSERT INTO posts (id, author, content, channel, created_at, author_account_id) VALUES (41, 'Alice', 'owned post', 'ops', '2024-03-04 05:07:08', 7)",
+                "INSERT INTO replies (id, post_id, author, content, created_at, author_account_id) VALUES (17, 41, 'Alice', 'owned reply', '2024-03-04 05:08:09', 7)");
+
+        runMigration();
+
+        List<String[]> history = queryHistory();
+        assertThat(history).hasSize(5);
+        assertThat(history.get(4))
+                .containsExactly("5", "SQL", "V5__add_post_likes.sql", "1");
+        assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id = 7 AND handle = 'alice'")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 41 AND author_account_id = 7")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM replies WHERE id = 17 AND author_account_id = 7")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM post_likes")).isZero();
     }
 
     @Test
@@ -323,4 +383,5 @@ class SchemaMigrationConfigTest {
         assertThat(tableExists("flyway_schema_history")).isFalse();
         assertThat(tableExists("foo")).isTrue();
     }
+
 }

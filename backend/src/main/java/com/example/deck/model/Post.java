@@ -9,4 +9,6 @@ public record Post(
         String content,
         String channel,
         Instant createdAt,
-        long replyCount) {}
+        long replyCount,
+        long likeCount,
+        boolean likedByViewer) {}

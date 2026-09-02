@@ -26,9 +26,18 @@ public class PostRepository {
     private static final String POST_SELECT = """
             SELECT p.id, COALESCE(a.display_name, p.author) AS author,
                    a.handle AS author_handle, p.content, p.channel, p.created_at,
-                   (SELECT COUNT(*) FROM replies r WHERE r.post_id = p.id) AS reply_count
+                   (SELECT COUNT(*) FROM replies r WHERE r.post_id = p.id) AS reply_count,
+                   (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
+                   %s AS liked_by_viewer
             FROM posts p
             LEFT JOIN accounts a ON a.id = p.author_account_id""";
+    private static final String ANONYMOUS_LIKED = "0";
+    private static final String VIEWER_LIKED = """
+            EXISTS(
+                SELECT 1 FROM post_likes viewer_like
+                WHERE viewer_like.post_id = p.id
+                  AND viewer_like.account_id = :viewerAccountId
+            )""";
 
     private final JdbcClient jdbcClient;
 
@@ -37,32 +46,54 @@ public class PostRepository {
     }
 
     public List<Post> findPage(String channel, int fetchLimit, PostCursor before) {
-        return findPage(channel, null, fetchLimit, before);
+        return findPage(channel, null, fetchLimit, before, null);
+    }
+
+    public List<Post> findPage(
+            String channel,
+            int fetchLimit,
+            PostCursor before,
+            Long viewerAccountId) {
+        return findPage(channel, null, fetchLimit, before, viewerAccountId);
     }
 
     public List<Post> findPageByAccountId(
             long accountId,
             int fetchLimit,
             PostCursor before) {
-        return findPage(null, accountId, fetchLimit, before);
+        return findPage(null, accountId, fetchLimit, before, null);
+    }
+
+    public List<Post> findPageByAccountId(
+            long accountId,
+            int fetchLimit,
+            PostCursor before,
+            Long viewerAccountId) {
+        return findPage(null, accountId, fetchLimit, before, viewerAccountId);
     }
 
     private List<Post> findPage(
             String channel,
-            Long accountId,
+            Long authorAccountId,
             int fetchLimit,
-            PostCursor before) {
-        StringBuilder sql = new StringBuilder(POST_SELECT);
+            PostCursor before,
+            Long viewerAccountId) {
+        String likedExpression = viewerAccountId == null ? ANONYMOUS_LIKED : VIEWER_LIKED;
+        StringBuilder sql = new StringBuilder(POST_SELECT.formatted(likedExpression));
         List<String> predicates = new ArrayList<>();
         Map<String, Object> parameters = new HashMap<>();
+
+        if (viewerAccountId != null) {
+            parameters.put("viewerAccountId", viewerAccountId);
+        }
 
         if (channel != null) {
             predicates.add("p.channel = :channel");
             parameters.put("channel", channel);
         }
-        if (accountId != null) {
+        if (authorAccountId != null) {
             predicates.add("p.author_account_id = :accountId");
-            parameters.put("accountId", accountId);
+            parameters.put("accountId", authorAccountId);
         }
         if (before != null) {
             predicates.add("""
@@ -139,7 +170,7 @@ public class PostRepository {
 
     public Optional<Post> findById(long id) {
         return jdbcClient
-                .sql(POST_SELECT + " WHERE p.id = :id")
+                .sql(POST_SELECT.formatted(ANONYMOUS_LIKED) + " WHERE p.id = :id")
                 .param("id", id)
                 .query(this::mapPost)
                 .optional();
@@ -173,6 +204,8 @@ public class PostRepository {
                 rs.getString("content"),
                 rs.getString("channel"),
                 instant,
-                rs.getLong("reply_count"));
+                rs.getLong("reply_count"),
+                rs.getLong("like_count"),
+                rs.getBoolean("liked_by_viewer"));
     }
 }

@@ -1,6 +1,6 @@
 # Phark 產品任務樹
 
-> 最後更新：2026-07-30
+> 最後更新：2026-08-09
 
 狀態：`[x]` 完成、`[~]` 進行中、`[ ]` 待辦。優先級由 P0 到 P2。
 
@@ -31,10 +31,10 @@
   - [x] handle、display name、bio
   - [x] session authentication 與 CSRF
   - [x] author ownership、legacy compatibility 與 profile page
-- [ ] **SDD-006 — Likes**
-  - [ ] idempotent like/unlike
-  - [ ] per-user uniqueness
-  - [ ] timeline optimistic update
+- [x] **SDD-006 — Likes**
+  - [x] idempotent like/unlike
+  - [x] per-user uniqueness
+  - [x] timeline optimistic update
 - [ ] **SDD-007 — Reposts**
   - [ ] repost/unrepost
   - [ ] original post attribution

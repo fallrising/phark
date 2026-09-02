@@ -13,6 +13,8 @@ interface ColumnProps {
   channel: Channel
   posts: Post[]
   sessionAccount: AccountProfile | null
+  pendingLikeIds: ReadonlySet<number>
+  likeErrors: Readonly<Record<number, string>>
   hasMore: boolean
   loadingMore: boolean
   error: string | null
@@ -20,12 +22,15 @@ interface ColumnProps {
   onAuthRequest: () => void
   onNavigateProfile: (handle: string) => void
   onReplyCreated: (postId: number) => void
+  onToggleLike: (post: Post) => Promise<void>
 }
 
 export function Column({
   channel,
   posts,
   sessionAccount,
+  pendingLikeIds,
+  likeErrors,
   hasMore,
   loadingMore,
   error,
@@ -33,6 +38,7 @@ export function Column({
   onAuthRequest,
   onNavigateProfile,
   onReplyCreated,
+  onToggleLike,
 }: ColumnProps) {
   return (
     <section className="flex h-full min-w-[280px] flex-1 flex-col rounded-2xl border border-border/70 bg-muted/30 md:min-w-0">
@@ -51,9 +57,12 @@ export function Column({
               key={post.id}
               post={post}
               sessionAccount={sessionAccount}
+              likePending={pendingLikeIds.has(post.id)}
+              likeError={likeErrors[post.id] ?? null}
               onAuthRequest={onAuthRequest}
               onNavigateProfile={onNavigateProfile}
               onReplyCreated={onReplyCreated}
+              onToggleLike={onToggleLike}
             />
           ))
         )}

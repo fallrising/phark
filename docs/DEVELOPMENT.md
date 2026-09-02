@@ -13,18 +13,18 @@ phark/
 │       │   ├── java/com/example/deck/
 │       │   │   ├── DeckApplication.java
 │       │   │   ├── config/       # Database, migration, security 與 SPA config
-│       │   │   ├── controller/   # Auth、account、profile、post、reply APIs
+│       │   │   ├── controller/   # Auth、account、profile、post、reply、like APIs
 │       │   │   ├── dto/          # JSON request/response boundaries
 │       │   │   ├── error/        # RFC 9457 codes、exception mapper、violations
 │       │   │   ├── model/        # Account、profile、content 與 page contracts
-│       │   │   ├── repository/   # Account/Post/Reply JdbcClient repositories
+│       │   │   ├── repository/   # Account/Post/Reply/PostLike JdbcClient repositories
 │       │   │   ├── security/     # Principal、UserDetails 與 Problem writers
-│       │   │   ├── service/      # Account、Post、Reply services
+│       │   │   ├── service/      # Account、Post、Reply、PostLike services
 │       │   │   └── web/          # Request correlation filter
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       ├── application-prod.properties
-│       │       └── db/migration/  # Immutable Flyway V1...V4
+│       │       └── db/migration/  # Immutable Flyway V1...V5
 │       └── test/
 ├── frontend/                # React + TypeScript + Vite + shadcn/ui
 │   ├── package.json
@@ -56,6 +56,7 @@ phark/
 | 對話串 | 每篇文章可正序讀取及建立單層回覆 |
 | 帳號 | Register、login、logout 與 30 分鐘 server-side session |
 | Profile | 公開 profile、作者文章分頁與 owner display name/bio 編輯 |
+| Likes | 每帳號冪等 like/unlike、權威 count 與 optimistic rollback |
 | 自動刷新 | 發文後三欄自動重新載入 |
 
 ## REST API
@@ -85,7 +86,9 @@ GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
       "content": "Hello",
       "channel": "home",
       "createdAt": "2026-07-13T10:00:00Z",
-      "replyCount": 2
+      "replyCount": 2,
+      "likeCount": 3,
+      "likedByViewer": true
     }
   ],
   "nextCursor": null
@@ -122,7 +125,9 @@ channel、limit 或 cursor 回傳 `400 Bad Request`。
   "content": "Hello",
   "channel": "home",
   "createdAt": "2026-07-13T10:00:00Z",
-  "replyCount": 0
+  "replyCount": 0,
+  "likeCount": 0,
+  "likedByViewer": false
 }
 ```
 
@@ -154,6 +159,27 @@ GET /api/posts/1/replies?limit=20&after=<opaque-cursor>
 使用目前 display name，`authorHandle` 是 canonical handle；V1–V3 legacy content
 保留既有 author snapshot 且 `authorHandle=null`。
 
+### `PUT /api/posts/{postId}/like` / `DELETE /api/posts/{postId}/like`
+
+兩者都需 authenticated session 與有效 CSRF，而且都可安全重送。PUT 在 relation
+已存在時為 no-op；DELETE 在 relation 不存在時為 no-op。成功一律回 `200`：
+
+```json
+{
+  "postId": 1,
+  "likeCount": 3,
+  "likedByViewer": true
+}
+```
+
+Actor 只取自 session，不接受 request body 中的 account identity。`postId <= 0` 回
+`INVALID_POST_ID`，不存在的正 ID 回 `POST_NOT_FOUND`。Self-like 與 legacy post
+like 都允許；mutation 不改文章 timestamp 或 timeline cursor order。
+
+Timeline 與 profile-post GET 的 `likeCount` 對所有 viewer 相同；
+`likedByViewer` 依目前 session 計算，anonymous 固定為 false。這兩種 response 使用
+`Cache-Control: private, no-store`，不可放進共享 cache。
+
 ### 帳號、Session 與 CSRF
 
 | Method | Path | Auth | 說明 |
@@ -175,7 +201,7 @@ UTF-8 bytes。Password 只保存 delegating BCrypt hash，永不出現在 respon
 
 1. 啟動時呼叫 `GET /api/auth/csrf`，token 只保存在記憶體。
 2. 同時呼叫 `GET /api/auth/session`，建立目前 identity state。
-3. 所有 `POST`、`PATCH`、`DELETE` 都使用 response 指定的 header name/token。
+3. 所有 `POST`、`PUT`、`PATCH`、`DELETE` 都使用 response 指定的 header name/token。
 4. Login/logout 完成後丟棄舊 token，等待新的 `/api/auth/csrf` response 才允許
    下一個 mutation。
 5. `CSRF_TOKEN_INVALID` 不自動重試 mutation；顯示安全錯誤並重新載入 token/page。
@@ -379,7 +405,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 | 範圍 | 命令 | 覆蓋 |
 |------|------|------|
-| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content、migration、errors |
+| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content/likes、migration、errors |
 | Frontend lint | `npm run lint`（在 `frontend/`） | oxlint |
 | Frontend build | `npm run build`（在 `frontend/`） | TypeScript + Vite |
 | 整合 | `docker build -t stream-deck .` | 含 frontend lint/build + Maven test |
@@ -395,7 +421,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 ## 給接手 LLM 的提示
 
-- 改 API 時同步更新 `PostControllerTest` 與 `frontend/src/api/posts.ts`
+- 改 post API 時同步更新 controller contract tests 與 `frontend/src/api/posts.ts`
 - 新增 channel 需改：`CreatePostRequest`、新增一個 forward-only migration 更新
   CHECK constraint、`PostService` seed、`frontend` 的 `Channel` type 與 UI；不可修改
   已發布的 migration

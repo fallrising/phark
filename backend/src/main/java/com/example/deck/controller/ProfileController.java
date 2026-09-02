@@ -8,6 +8,7 @@ import com.example.deck.model.PostPage;
 import com.example.deck.security.AccountPrincipal;
 import com.example.deck.service.AccountService;
 import com.example.deck.service.PostService;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -49,8 +50,12 @@ public class ProfileController {
     public PostPage getProfilePosts(
             @PathVariable String handle,
             @RequestParam(defaultValue = "20") int limit,
-            @RequestParam(required = false) String before) {
+            @RequestParam(required = false) String before,
+            @AuthenticationPrincipal AccountPrincipal principal,
+            HttpServletResponse response) {
+        response.setHeader("Cache-Control", "private, no-store");
         long accountId = accountService.getAccountIdByHandle(handle);
-        return postService.getPostsByAccountId(accountId, limit, before);
+        Long viewerAccountId = principal == null ? null : principal.getAccountId();
+        return postService.getPostsByAccountId(accountId, limit, before, viewerAccountId);
     }
 }

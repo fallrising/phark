@@ -7,13 +7,18 @@ import {
   type AccountProfile,
 } from "@/api/accounts"
 import { getApiErrorMessage } from "@/api/client"
-import { fetchPosts } from "@/api/posts"
+import { fetchPosts, likePost, unlikePost } from "@/api/posts"
 import { AccountControls } from "@/components/AccountControls"
 import { Column } from "@/components/Column"
 import { Composer } from "@/components/Composer"
 import { ProfileView } from "@/components/ProfileView"
 import { Button } from "@/components/ui/button"
-import type { Channel, Post } from "@/types/post"
+import {
+  applyLikeStateToPosts,
+  optimisticLikeState,
+  snapshotLikeState,
+} from "@/lib/postLikes"
+import type { Channel, LikeState, Post } from "@/types/post"
 
 const CHANNELS: Channel[] = ["home", "tech", "ops"]
 
@@ -34,6 +39,21 @@ function emptyFeeds(): Record<Channel, ChannelFeed> {
     home: { items: [], nextCursor: null, loadingMore: false, error: null },
     tech: { items: [], nextCursor: null, loadingMore: false, error: null },
     ops: { items: [], nextCursor: null, loadingMore: false, error: null },
+  }
+}
+
+function applyLikeStateToFeeds(
+  feeds: Record<Channel, ChannelFeed>,
+  state: LikeState
+): Record<Channel, ChannelFeed> {
+  const updateFeed = (feed: ChannelFeed): ChannelFeed => ({
+    ...feed,
+    items: applyLikeStateToPosts(feed.items, state),
+  })
+  return {
+    home: updateFeed(feeds.home),
+    tech: updateFeed(feeds.tech),
+    ops: updateFeed(feeds.ops),
   }
 }
 
@@ -61,8 +81,11 @@ export default function App() {
   const [identityError, setIdentityError] = useState<string | null>(null)
   const [route, setRoute] = useState<Route>(readRoute)
   const [profileRefreshVersion, setProfileRefreshVersion] = useState(0)
+  const [pendingLikeIds, setPendingLikeIds] = useState<Set<number>>(new Set())
+  const [likeErrors, setLikeErrors] = useState<Record<number, string>>({})
   const refreshVersion = useRef(0)
   const loadingChannels = useRef(new Set<Channel>())
+  const likeMutations = useRef(new Set<number>())
   const bootStarted = useRef(false)
   const accountControlsRef = useRef<HTMLDivElement>(null)
 
@@ -71,6 +94,7 @@ export default function App() {
     loadingChannels.current.clear()
     setLoading(true)
     setError(null)
+    setLikeErrors({})
 
     try {
       const results = await Promise.all(
@@ -177,6 +201,13 @@ export default function App() {
     [feeds]
   )
 
+  const requestAuthentication = useCallback(() => {
+    accountControlsRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    })
+  }, [])
+
   const handleReplyCreated = useCallback((postId: number) => {
     setFeeds((current) => {
       const updateFeed = (feed: ChannelFeed): ChannelFeed => ({
@@ -196,6 +227,70 @@ export default function App() {
     })
   }, [])
 
+  const handleToggleLike = useCallback(
+    async (post: Post) => {
+      if (sessionAccount === null) {
+        setLikeErrors((current) => ({
+          ...current,
+          [post.id]: "Sign in to like this post.",
+        }))
+        requestAuthentication()
+        return
+      }
+      if (securityReady !== true) {
+        setLikeErrors((current) => ({
+          ...current,
+          [post.id]:
+            securityReady === null
+              ? "Secure actions are still initializing."
+              : "Secure actions are unavailable. Retry account security setup.",
+        }))
+        return
+      }
+      if (likeMutations.current.has(post.id)) return
+
+      const snapshot = snapshotLikeState(post)
+      const optimistic = optimisticLikeState(snapshot)
+      const requestVersion = refreshVersion.current
+      likeMutations.current.add(post.id)
+      setPendingLikeIds((current) => new Set(current).add(post.id))
+      setLikeErrors((current) => {
+        const next = { ...current }
+        delete next[post.id]
+        return next
+      })
+      setFeeds((current) => applyLikeStateToFeeds(current, optimistic))
+
+      try {
+        const state = snapshot.likedByViewer
+          ? await unlikePost(post.id)
+          : await likePost(post.id)
+        if (requestVersion === refreshVersion.current) {
+          setFeeds((current) => applyLikeStateToFeeds(current, state))
+        }
+      } catch (error) {
+        if (requestVersion === refreshVersion.current) {
+          setFeeds((current) => applyLikeStateToFeeds(current, snapshot))
+          setLikeErrors((current) => ({
+            ...current,
+            [post.id]: getApiErrorMessage(
+              error,
+              "Unable to update this like. Please try again."
+            ),
+          }))
+        }
+      } finally {
+        likeMutations.current.delete(post.id)
+        setPendingLikeIds((current) => {
+          const next = new Set(current)
+          next.delete(post.id)
+          return next
+        })
+      }
+    },
+    [requestAuthentication, securityReady, sessionAccount]
+  )
+
   const navigateHome = useCallback(() => {
     window.history.pushState(null, "", "/")
     setRoute({ kind: "home" })
@@ -207,13 +302,6 @@ export default function App() {
     window.history.pushState(null, "", path)
     setRoute({ kind: "profile", handle })
     window.scrollTo({ top: 0, behavior: "smooth" })
-  }, [])
-
-  const requestAuthentication = useCallback(() => {
-    accountControlsRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    })
   }, [])
 
   const handleAccountChanged = useCallback(
@@ -319,6 +407,7 @@ export default function App() {
           key={`${route.handle}:${profileRefreshVersion}`}
           handle={route.handle}
           sessionAccount={sessionAccount}
+          securityReady={securityReady}
           onBack={navigateHome}
           onAuthRequest={requestAuthentication}
           onNavigateProfile={navigateProfile}
@@ -352,6 +441,8 @@ export default function App() {
                     channel={channel}
                     posts={feed.items}
                     sessionAccount={sessionAccount}
+                    pendingLikeIds={pendingLikeIds}
+                    likeErrors={likeErrors}
                     hasMore={feed.nextCursor !== null}
                     loadingMore={feed.loadingMore}
                     error={feed.error}
@@ -359,6 +450,7 @@ export default function App() {
                     onAuthRequest={requestAuthentication}
                     onNavigateProfile={navigateProfile}
                     onReplyCreated={handleReplyCreated}
+                    onToggleLike={handleToggleLike}
                   />
                 )
               })}
