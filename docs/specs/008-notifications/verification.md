@@ -7,7 +7,8 @@
 
 | Commit | 範圍 |
 |--------|------|
-| This checkpoint | Spec、design、風險與 54 項孫任務 |
+| `f805560` | Spec、design、風險與 54 項孫任務 |
+| This checkpoint | V7 migration、notification persistence/page projection 與 500-row retention |
 
 ## Inherited baseline
 
@@ -20,10 +21,10 @@
 
 | Gate | 狀態 | 證據 |
 |------|------|------|
-| V7 migration/repository tests | 待執行 | B 階段 |
+| V7 migration/repository tests | 通過 | 11 tests；0 failures、0 errors、0 skipped |
 | Transactional event emission tests | 待執行 | C 階段 |
 | Notification cursor/read API/security tests | 待執行 | D 階段 |
-| Complete backend regression | 待執行 | B–F 各 checkpoint |
+| Complete backend regression | 通過（B checkpoint） | 205 tests；0 failures、0 errors、0 skipped |
 | Frontend lint/build | 待執行 | E 階段 |
 | Multi-stage Docker build | 待執行 | F 階段 |
 | Production-like runtime smoke | 待執行 | F 階段 |
@@ -45,9 +46,9 @@ run/job URL 與 commit SHA；未實際執行的 gate 不標記為通過。
   需要 immutable event ID。
 - 選擇 recipient-scoped synchronous 500-row prune：現階段不引入 scheduler/queue，並讓讀取、
   分頁與未讀成本有 hard bound。
-- OpenCode 的 DeepSeek V4 Flash model ID 已確認為 `opencode-go/deepseek-v4-flash`；實測模型
-  正確啟動前被 provider 擋下，因中國託管版本需要 workspace owner 明確 opt-in。本輪未代替
-  使用者接受資料託管條款。
+- OpenCode 的 DeepSeek V4 Flash model ID 已確認為 `opencode-go/deepseek-v4-flash`；初次實測
+  被中國託管 opt-in gate 擋下。使用者完成 workspace opt-in 後，以精確 `run -m` 形式成功
+  執行 B.2 RED 與 B.3 GREEN 任務。
 - OpenCode 唯讀 inventory 確認 V7、三個 service mutation points、獨立 cursor codec、header /
   App route 與 migration/contract test locations；其四個建議經主代理審查後未採用：通知不按
   unread-first 排序（會破壞穩定 ID keyset）、read endpoint 使用 monotonic PUT 而非 PATCH、
@@ -69,3 +70,27 @@ docker build -t phark:sdd008 .
 
 Host 若仍無 JDK，使用 repository Dockerfile 或 pinned Maven container；Node 沿用 repository
 已使用的 nvm/npm。不得以 mock 取代 SQLite migration/transaction 與 production wiring evidence。
+
+## Persistence checkpoint evidence
+
+- Migration RED 經主代理把 OpenCode 初稿的重複 scenarios 合併回既有 upgrade contracts；
+  `SchemaMigrationConfigTest` 8 tests 中 7 個如預期只因 history 停在 V6 而失敗，unknown schema
+  fail-closed test 保持通過。
+- Repository RED：新增 `NotificationRepositoryTest` 後 test compilation 產生 39 個預期
+  `cannot find symbol`，只指向尚不存在的 `NotificationRepository`、`NotificationType` 與
+  `NotificationItem`。
+- GREEN migration 新增 immutable V7 tables、三 type/reply-shape checks、reply uniqueness、五個
+  cascade FKs 與 recipient/ID index；empty、V3/V4/V5/V6、兩種 pre-Flyway legacy paths 都到
+  V7，既有資料與 IDs 保留且不回填通知。
+- Repository `insertAndPrune` 回 generated event ID，保留每個 recipient 最新 500 rows；
+  `findPage` 以單一 parameterized JOIN 回 current actor/post/reply content、read flag 與 strict
+  ID-desc/before page。另一 recipient 不受 prune 影響。
+- 初次 GREEN 暴露 sqlite-jdbc nullable `reply_id` mapping 問題；改用 `getLong` 並立即保存
+  `wasNull()`，避免後續 getter 覆寫 JDBC null state。
+- Focused：
+  `mvn -f backend/pom.xml -B -Dtest=SchemaMigrationConfigTest,NotificationRepositoryTest test`
+  → 11 tests 通過（8 migration + 3 repository）。
+- Regression：`mvn -f backend/pom.xml -B test` → 205 tests 通過。
+- Host 無 JDK；以上 commands 在 `maven:3.9-eclipse-temurin-17` container 執行。
+- B checkpoint 尚未接 event services、read cursor/API 或 frontend；這些分別由 C、D、E 階段
+  驗證，不把 repository projection 誤報成可用 HTTP behavior。

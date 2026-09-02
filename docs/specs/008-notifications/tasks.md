@@ -20,18 +20,18 @@
 
 ## B：V7 notification persistence
 
-- [ ] **B.1 RED — Migration contract**
-  - [ ] B.1.1 測試 empty database 建立 notifications/read state、checks、FK 與 index。
-  - [ ] B.1.2 測試 populated V6/V5/V4/V3 upgrade 保留資料且不回填 events。
-  - [ ] B.1.3 測試 legacy baseline upgrade 到 V7 並保持既有 IDs/integrity。
-- [ ] **B.2 RED — Event repository contract**
-  - [ ] B.2.1 測試 REPLY/LIKE/REPOST projection 與 current actor/post/reply content。
-  - [ ] B.2.2 測試 reply uniqueness、recipient isolation 與 FK/check constraints。
-  - [ ] B.2.3 測試第 501 筆 prune 最舊 row 且不影響其他 recipient。
-- [ ] **B.3 GREEN/REFACTOR — Schema 與 persistence**
-  - [ ] B.3.1 新增 immutable `V7__add_notifications.sql`。
-  - [ ] B.3.2 實作 insert/prune、owner lookup 與 page/summary repository operations。
-  - [ ] B.3.3 執行 focused migration/repository 與完整 backend regression。
+- [x] **B.1 RED — Migration contract**
+  - [x] B.1.1 測試 empty database 建立 notifications/read state、checks、FK 與 index。
+  - [x] B.1.2 測試 populated V6/V5/V4/V3 upgrade 保留資料且不回填 events。
+  - [x] B.1.3 測試 legacy baseline upgrade 到 V7 並保持既有 IDs/integrity。
+- [x] **B.2 RED — Event repository contract**
+  - [x] B.2.1 測試 REPLY/LIKE/REPOST projection 與 current actor/post/reply content。
+  - [x] B.2.2 測試 reply uniqueness、recipient isolation 與 FK/check constraints。
+  - [x] B.2.3 測試第 501 筆 prune 最舊 row 且不影響其他 recipient。
+- [x] **B.3 GREEN/REFACTOR — Schema 與 persistence**
+  - [x] B.3.1 新增 immutable `V7__add_notifications.sql`。
+  - [x] B.3.2 實作 insert/prune 與 current-content ID-desc page repository operations。
+  - [x] B.3.3 執行 focused migration/repository 與完整 backend regression。
 
 ## C：Transactional event emission
 
@@ -45,7 +45,7 @@
   - [ ] C.2.3 測試取消不撤回、重做產生新 ID 與 notification failure rollback。
 - [ ] **C.3 GREEN/REFACTOR — Service wiring**
   - [ ] C.3.1 讓 like/repost insert 回 affected-row signal，database unique 仍為真值。
-  - [ ] C.3.2 將三種 event insert/prune 接到既有 transactional services。
+  - [ ] C.3.2 實作 owner lookup，將三種 event insert/prune 接到 transactional services。
   - [ ] C.3.3 執行 focused mutation/event 與完整 backend regression。
 
 ## D：通知 read/unread API
@@ -59,7 +59,7 @@
   - [ ] D.2.2 測試 invalid limit/cursor/body 與 other-account cursor 無副作用。
   - [ ] D.2.3 測試 anonymous/CSRF 拒絕、private no-store 與 matcher ordering。
 - [ ] **D.3 GREEN/REFACTOR — Controller/service wiring**
-  - [ ] D.3.1 實作 cursor codec、NotificationService 與 page/read models。
+  - [ ] D.3.1 實作 cursor codec、summary/read repository、service 與 page/read models。
   - [ ] D.3.2 實作 GET/PUT controller、validation 與 explicit security matchers。
   - [ ] D.3.3 執行 focused cursor/API/security 與完整 backend suite。
 
