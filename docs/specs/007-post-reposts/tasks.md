@@ -20,18 +20,18 @@
 
 ## B：V6 repost persistence
 
-- [ ] **B.1 RED — Migration contract**
-  - [ ] B.1.1 測試 empty database 建立 event ID、unique relation、FK 與 indexes。
-  - [ ] B.1.2 測試 populated V5/V4/V3 upgrade 保留 content/likes/ownership/IDs。
-  - [ ] B.1.3 測試 legacy baseline upgrade 到 V6 且既有內容沒有 repost activity。
-- [ ] **B.2 GREEN — Schema 與 repository**
-  - [ ] B.2.1 新增 immutable `V6__add_post_reposts.sql`。
-  - [ ] B.2.2 實作 conflict-safe repost 與精確 unrepost operations。
-  - [ ] B.2.3 實作 authoritative count/viewer state 與 timestamp readback。
-- [ ] **B.3 GREEN/REFACTOR — Persistence behavior**
-  - [ ] B.3.1 驗證同 actor 重送不增 row 且不 bump activity time。
-  - [ ] B.3.2 驗證兩 actor shared count、isolated state 與 cascade constraints。
-  - [ ] B.3.3 執行 focused migration/repository 與完整 backend regression。
+- [x] **B.1 RED — Migration contract**
+  - [x] B.1.1 測試 empty database 建立 event ID、unique relation、FK 與 indexes。
+  - [x] B.1.2 測試 populated V5/V4/V3 upgrade 保留 content/likes/ownership/IDs。
+  - [x] B.1.3 測試 legacy baseline upgrade 到 V6 且既有內容沒有 repost activity。
+- [x] **B.2 GREEN — Schema 與 repository**
+  - [x] B.2.1 新增 immutable `V6__add_post_reposts.sql`。
+  - [x] B.2.2 實作 conflict-safe repost 與精確 unrepost operations。
+  - [x] B.2.3 實作 authoritative count/viewer state 並保存 activity timestamp。
+- [x] **B.3 GREEN/REFACTOR — Persistence behavior**
+  - [x] B.3.1 驗證同 actor 重送不增 row 且不 bump activity time。
+  - [x] B.3.2 驗證兩 actor shared count、isolated state 與 cascade constraints。
+  - [x] B.3.3 執行 focused migration/repository 與完整 backend regression。
 
 ## C：Mixed timeline 與 attribution
 

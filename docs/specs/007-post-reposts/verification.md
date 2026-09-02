@@ -7,7 +7,8 @@
 
 | Commit | 範圍 |
 |--------|------|
-| This checkpoint | Spec、design、風險與 54 項孫任務 |
+| `ddf78de` | Spec、design、風險與 54 項孫任務 |
+| This checkpoint | V6 migration、repost relation persistence 與 upgrade evidence |
 
 ## Inherited baseline
 
@@ -22,7 +23,7 @@
 
 | Gate | 狀態 | 證據 |
 |------|------|------|
-| V6 migration/repository tests | Pending | — |
+| V6 migration/repository tests | 通過 | 11 tests；0 failures、0 errors、0 skipped |
 | Mixed cursor/timeline/profile tests | Pending | — |
 | Repost API/security tests | Pending | — |
 | Complete backend regression | Pending | — |
@@ -61,3 +62,24 @@ docker build -t phark:sdd007 .
 
 Host 若仍無 JDK/Node，使用 repository Dockerfile 或 pinned Maven/Node container 執行，
 不得以 mock 取代 mixed SQLite query 與 production wiring evidence。
+
+## Persistence checkpoint evidence
+
+- 規格 baseline：draft PR #7 的 CI run `33620782252` 在 commit `ddf78de` 通過
+  production container build。
+- RED migration：加入最初三個 V6 contracts 後，
+  `SchemaMigrationConfigTest` 8 tests 中 3 個如預期失敗；Flyway history 只有 5 rows，
+  證明 V6 尚不存在。
+- RED repository：focused test compilation 因 planned `RepostState` 與
+  `PostRepostRepository` 缺失而失敗。
+- Review refactor：把重複的 empty/legacy assertions 合併回既有 upgrade tests，修正一個
+  未來會重複插入既有 like 的測試資料，並新增真實 populated V3 → V6 path。
+- GREEN focused：
+  `mvn -f backend/pom.xml -B -Dtest=SchemaMigrationConfigTest,PostRepostRepositoryTest test`
+  → 11 tests 通過（7 migration + 4 repository）。
+- Regression：`mvn -f backend/pom.xml -B test` → 170 tests 通過。
+- Migration coverage 包含 empty、populated V3/V4/V5、pre-Flyway legacy、unknown schema
+  fail-closed；驗證 surrogate ID、unique relation、兩個 cascade FK 與兩個 named indexes。
+- Repository coverage 包含重送不 bump timestamp、重複 unrepost、two-viewer shared count /
+  isolated state，以及實際刪除 account/post 的 cascade behavior。
+- Host 無 JDK；以上 Maven commands 在 `maven:3.9-eclipse-temurin-17` container 執行。
