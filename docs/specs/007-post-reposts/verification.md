@@ -11,7 +11,8 @@
 | `0b1372c` | V6 migration、repost relation persistence 與 upgrade evidence |
 | `fa828b9` | Versioned cursor、mixed timeline/profile reads 與 attribution |
 | `08f2853` | Authenticated PUT/DELETE repost API 與 security boundary |
-| This checkpoint | Frontend attribution、optimistic interaction 與 activity refresh |
+| `cecab85` | Frontend attribution、optimistic interaction 與 activity refresh |
+| This checkpoint | 開發/營運文件、production image 與 runtime smoke evidence |
 
 ## Inherited baseline
 
@@ -30,11 +31,11 @@
 | V6 migration/repository tests | 通過 | 11 tests；0 failures、0 errors、0 skipped |
 | Mixed cursor/timeline/profile tests | 通過 | 55 focused tests；0 failures、0 errors、0 skipped |
 | Repost API/security tests | 通過 | 26 focused tests；0 failures、0 errors、0 skipped |
-| Complete backend regression | 通過（API checkpoint） | 201 tests；0 failures、0 errors、0 skipped |
-| Frontend lint | 通過 | `oxlint`；0 diagnostics |
+| Complete backend regression | 通過（production image） | 201 tests；0 failures、0 errors、0 skipped |
+| Frontend lint | 通過 | `oxlint`；0 warnings、0 errors、23 files |
 | Frontend production build | 通過 | TypeScript + Vite；1,862 modules transformed |
-| Multi-stage Docker build | Pending | — |
-| Production-like runtime smoke | Pending | — |
+| Multi-stage Docker build | 通過 | 201 tests；non-root image `sha256:cd304bfc...10c56` |
+| Production-like runtime smoke | 通過 | clean/populated migration、two-viewer repost、cursor/security/profile/SPA |
 | GitHub Actions final head | Pending | — |
 
 完成時記錄 exact commands、RED failures、test counts、image digest、runtime scenarios、
@@ -143,3 +144,43 @@ Host 若仍無 JDK/Node，使用 repository Dockerfile 或 pinned Maven/Node con
 - Repository 沒有 frontend test runner；依規格不新增 dependency，本 checkpoint 以 pure helper
   review、lint 與 production TypeScript build 驗證，runtime behavior 留在 F.2 production-like
   smoke。
+- Frontend checkpoint `cecab85` 的 GitHub Actions run `33627437512` 已通過 production
+  container build。
+
+## Production image evidence
+
+- `docker build --progress=plain -t phark:sdd007 .` → multi-stage build 通過：frontend
+  `oxlint` 23 files / 0 warnings / 0 errors、TypeScript/Vite 1,862 modules，以及完整 backend
+  201 tests / 0 failures / 0 errors / 0 skipped。
+- Build 內 migration suite 驗證 empty、populated V3/V4/V5 與 pre-Flyway legacy paths；
+  所有支援路徑都到 V6，populated V5 只套用一筆 V6 migration。
+- Image：`sha256:cd304bfca3f6e626af6c1afd116991d33ebfe12f60ad9c765ad2b18717110c56`；
+  runtime user `10001:10001`，entrypoint `java -jar /app/app.jar`。
+
+## Production-like runtime evidence
+
+Image `phark:sdd007` 以 `SPRING_PROFILES_ACTIVE=prod`、
+`SESSION_COOKIE_SECURE=false` 啟動於 loopback；驗收完成後兩個 containers、兩個暫存
+database directories 與只含測試密碼的 smoke script 都已移除。
+
+- Clean database：production image 從 empty schema 套用 V1–V6、health 回 `UP`；停止後
+  `PRAGMA integrity_check=ok`、latest version 6、seed posts 9、`post_reposts` rows 0。
+- Populated upgrade：先以 merged SDD-006 image 建立真實 V5 database（Alice/Bob accounts、
+  Bob-owned tech post 10、Alice like），再以 SDD-007 image 原地啟動；Flyway 只套用 V6，
+  health 為 healthy。停止後 integrity `ok`，history V1–V6 全 success，兩個 named V6
+  indexes 存在，accounts/posts/likes 分別保持 2/10/1，最終 repost relation 為 1。
+- Alice 連續 PUT 得到相同 `RepostState`、count 1 且只有一筆 activity；tech timeline
+  同時包含 original/repost，兩份原文 ID/author/content/like state 相同且 activity key 不同，
+  home 不包含該 tech activity。Alice profile 只有自己的 repost activity，Bob profile 不會
+  收到 Alice repost。
+- Bob 看到 shared count 1/viewer false；self-repost 成功後 count 2，Bob profile 包含
+  original + self-repost；連續 DELETE 後 count 維持 1，Alice activity 不受影響。
+- Anonymous timeline 的 count/attribution 一致、viewer false 且 `private, no-store`；帶有效
+  CSRF 但無 session 的 PUT 回 401，Alice 缺 CSRF 的 DELETE 回 403，兩條拒絕路徑後
+  relation/count/membership 都不變。
+- Tech timeline 以 `limit=1` 逐頁讀取 5 activities，所有 `timelineEntryId` 無重複，兩筆
+  目標 original/repost 都出現；新 cursor 解碼 payload 以 `2:` 開頭，canonical legacy
+  cursor 仍回 200。
+- Alice 連續 DELETE 後 count 0、timeline 只剩 original、Alice profile activity 消失；
+  再 PUT 產生新 activity key `repost:4`，不同於第一次的 `repost:1`。
+- Direct `/profiles/alice007` 回 production SPA HTML shell。

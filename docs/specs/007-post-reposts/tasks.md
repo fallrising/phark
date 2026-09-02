@@ -80,14 +80,14 @@
 
 ## F：文件與整合交付
 
-- [ ] **F.1 開發/營運文件**
-  - [ ] F.1.1 記錄 repost API、timeline JSON、fan-out 與 cursor contract。
-  - [ ] F.1.2 記錄 V6 upgrade/backup/rollback、indexes 與 query constraints。
-  - [ ] F.1.3 更新 architecture、development、roadmap 與 SDD evidence。
-- [ ] **F.2 Production-like validation**
-  - [ ] F.2.1 Docker multi-stage build 與 clean/populated V5-to-V6 migration。
-  - [ ] F.2.2 Runtime 驗證 two-viewer repost/idempotency/attribution/fan-out。
-  - [ ] F.2.3 Runtime 驗證 mixed cursor/unrepost/anonymous/CSRF/profile/SPA paths。
+- [x] **F.1 開發/營運文件**
+  - [x] F.1.1 記錄 repost API、timeline JSON、fan-out 與 cursor contract。
+  - [x] F.1.2 記錄 V6 upgrade/backup/rollback、indexes 與 query constraints。
+  - [x] F.1.3 更新 architecture、development、roadmap 與 SDD evidence。
+- [x] **F.2 Production-like validation**
+  - [x] F.2.1 Docker multi-stage build 與 clean/populated V5-to-V6 migration。
+  - [x] F.2.2 Runtime 驗證 two-viewer repost/idempotency/attribution/fan-out。
+  - [x] F.2.3 Runtime 驗證 mixed cursor/unrepost/anonymous/CSRF/profile/SPA paths。
 - [ ] **F.3 CI 與交付**
   - [ ] F.3.1 推送所有階段 commits 並維護 draft PR。
   - [ ] F.3.2 GitHub Actions final head 全綠。

@@ -1,7 +1,7 @@
 # Schema Migration Production Runbook
 
 > 適用於 deck 應用（`deck` Compose project），基於 Flyway + SQLite。
-> 最後更新：2026-08-09
+> 最後更新：2026-09-02
 
 ---
 
@@ -164,7 +164,7 @@ Runtime image 刻意不安裝 `sqlite3`；history 一律使用 host CLI 查詢�
 所有 migration 的 `success` 欄位應為 `1`。若版本號與預期不符，表示
 baseline 或 migration 順序有落差。
 
-SDD-006 release 的預期 latest version 是 V5 `add post likes`。V4 新增
+SDD-007 release 的預期 latest version 是 V6 `add post reposts`。V4 新增
 `accounts`、nullable `posts.author_account_id`、nullable
 `replies.author_account_id` 與對應 indexes。升級 V3 或 legacy baseline 時不得依
 `author` 字串建立 account；所有既有 ownership 必須保持 `NULL`，既有 row、ID、
@@ -175,6 +175,17 @@ foreign keys 分別指向 posts/accounts 並使用 `ON DELETE CASCADE`。從 pop
 升級時 accounts、owned posts/replies、IDs 與 timestamps 都必須保留，且新 table
 必須為空。回滾 V5 application image 時仍需同時還原部署前 database backup；舊 image
 不認識 V5 schema，不能只切回 image 就宣稱 rollback 完成。
+
+V6 只新增 `post_reposts`，使用 surrogate `id`（AUTOINCREMENT）作為 timeline
+activity identity，`(post_id, account_id)` UNIQUE constraint 保證每帳號對每原文
+只有一筆 relation，兩個 foreign keys 使用 `ON DELETE CASCADE`。從 populated V5 升級時
+所有既有的 accounts、posts、likes、IDs 與 timestamps 都必須保留，且新 table 必須為空。
+V6 建立兩個 named indexes：`idx_post_reposts_timeline`（`created_at DESC, id
+DESC`）支援 shared feed ordering；`idx_post_reposts_account_timeline`（`account_id,
+created_at DESC, id DESC`）支援 profile feed。Mixed timeline query 使用 bounded
+`UNION ALL` 合併 original 與 repost branch，最大 page size 為 100。回滾 V6
+application image 時仍需同時還原部署前 database backup；舊 image 不認識 V6 schema，
+不能只切回 image 就宣稱 rollback 完成。不手動 DELETE flyway_schema_history rows。
 
 ---
 
@@ -279,7 +290,7 @@ New image:    ghcr.io/fallrising/phark:sha-def456...
 Backup:       /opt/apps/deck/backups/deck-20260730T120000Z.db
 Integrity:    ok
 Container:    Up (healthy)
-Migration:    V1 ~ V5 success = 1
+Migration:    V1 ~ V6 success = 1
 Result:       SUCCESS / FAILED → restored to abc123...
 ```
 
