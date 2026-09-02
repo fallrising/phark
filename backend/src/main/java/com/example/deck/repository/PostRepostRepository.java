@@ -13,8 +13,8 @@ public class PostRepostRepository {
         this.jdbcClient = jdbcClient;
     }
 
-    public void repost(long postId, long accountId) {
-        jdbcClient
+    public boolean repost(long postId, long accountId) {
+        int created = jdbcClient
                 .sql("""
                         INSERT INTO post_reposts (post_id, account_id)
                         VALUES (:postId, :accountId)
@@ -22,6 +22,7 @@ public class PostRepostRepository {
                 .param("postId", postId)
                 .param("accountId", accountId)
                 .update();
+        return created > 0;
     }
 
     public void unrepost(long postId, long accountId) {

@@ -8,6 +8,10 @@ import {
 } from "@/api/accounts"
 import { getApiErrorMessage } from "@/api/client"
 import {
+  fetchNotifications,
+  markNotificationsRead,
+} from "@/api/notifications"
+import {
   fetchPosts,
   likePost,
   repostPost,
@@ -17,6 +21,7 @@ import {
 import { AccountControls } from "@/components/AccountControls"
 import { Column } from "@/components/Column"
 import { Composer } from "@/components/Composer"
+import { NotificationView } from "@/components/NotificationView"
 import { ProfileView } from "@/components/ProfileView"
 import { Button } from "@/components/ui/button"
 import {
@@ -30,6 +35,7 @@ import {
   snapshotRepostState,
 } from "@/lib/postReposts"
 import type { Channel, LikeState, Post, RepostState } from "@/types/post"
+import type { NotificationItem } from "@/types/notification"
 
 const CHANNELS: Channel[] = ["home", "tech", "ops"]
 
@@ -40,9 +46,22 @@ interface ChannelFeed {
   error: string | null
 }
 
+interface NotificationFeed {
+  items: NotificationItem[]
+  nextCursor: string | null
+  latestCursor: string | null
+  readThroughCursor: string | null
+  unreadCount: number
+  loading: boolean
+  loadingMore: boolean
+  markingRead: boolean
+  error: string | null
+}
+
 type Route =
   | { kind: "home" }
   | { kind: "profile"; handle: string }
+  | { kind: "notifications" }
   | { kind: "not-found" }
 
 function emptyFeeds(): Record<Channel, ChannelFeed> {
@@ -50,6 +69,20 @@ function emptyFeeds(): Record<Channel, ChannelFeed> {
     home: { items: [], nextCursor: null, loadingMore: false, error: null },
     tech: { items: [], nextCursor: null, loadingMore: false, error: null },
     ops: { items: [], nextCursor: null, loadingMore: false, error: null },
+  }
+}
+
+function emptyNotifications(): NotificationFeed {
+  return {
+    items: [],
+    nextCursor: null,
+    latestCursor: null,
+    readThroughCursor: null,
+    unreadCount: 0,
+    loading: false,
+    loadingMore: false,
+    markingRead: false,
+    error: null,
   }
 }
 
@@ -84,6 +117,9 @@ function applyRepostStateToFeeds(
 }
 
 function readRoute(): Route {
+  if (/^\/notifications\/?$/.test(window.location.pathname)) {
+    return { kind: "notifications" }
+  }
   const profileMatch = window.location.pathname.match(/^\/profiles\/([^/]+)\/?$/)
   if (profileMatch) {
     try {
@@ -103,6 +139,8 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sessionAccount, setSessionAccount] = useState<AccountProfile | null>(null)
+  const [notifications, setNotifications] =
+    useState<NotificationFeed>(emptyNotifications)
   const [securityReady, setSecurityReady] = useState<boolean | null>(null)
   const [identityError, setIdentityError] = useState<string | null>(null)
   const [route, setRoute] = useState<Route>(readRoute)
@@ -112,6 +150,8 @@ export default function App() {
   const [pendingRepostIds, setPendingRepostIds] = useState<Set<number>>(new Set())
   const [repostErrors, setRepostErrors] = useState<Record<number, string>>({})
   const refreshVersion = useRef(0)
+  const notificationVersion = useRef(0)
+  const notificationLoadingMore = useRef(false)
   const loadingChannels = useRef(new Set<Channel>())
   const postMutations = useRef(new Set<number>())
   const bootStarted = useRef(false)
@@ -155,6 +195,43 @@ export default function App() {
     }
   }, [])
 
+  const refreshNotifications = useCallback(
+    async (account: AccountProfile | null) => {
+      const requestVersion = ++notificationVersion.current
+      notificationLoadingMore.current = false
+
+      if (account === null) {
+        setNotifications(emptyNotifications())
+        return
+      }
+
+      setNotifications({ ...emptyNotifications(), loading: true })
+      try {
+        const page = await fetchNotifications()
+        if (requestVersion !== notificationVersion.current) return
+
+        setNotifications({
+          items: [...page.items],
+          nextCursor: page.nextCursor,
+          latestCursor: page.latestCursor,
+          readThroughCursor: page.readThroughCursor,
+          unreadCount: page.unreadCount,
+          loading: false,
+          loadingMore: false,
+          markingRead: false,
+          error: null,
+        })
+      } catch (error) {
+        if (requestVersion !== notificationVersion.current) return
+        setNotifications({
+          ...emptyNotifications(),
+          error: getApiErrorMessage(error, "Unable to load notifications."),
+        })
+      }
+    },
+    []
+  )
+
   const initializeIdentity = useCallback(async () => {
     setSecurityReady(null)
     setIdentityError(null)
@@ -166,13 +243,115 @@ export default function App() {
       ])
       setSessionAccount(session.account)
       setSecurityReady(true)
+      await refreshNotifications(session.account)
     } catch (error) {
+      setSessionAccount(null)
+      await refreshNotifications(null)
       setSecurityReady(false)
       setIdentityError(
         getApiErrorMessage(error, "Unable to initialize secure account actions.")
       )
     }
-  }, [])
+  }, [refreshNotifications])
+
+  const loadMoreNotifications = useCallback(async () => {
+    const before = notifications.nextCursor
+    if (before === null || notificationLoadingMore.current) return
+
+    const requestVersion = notificationVersion.current
+    notificationLoadingMore.current = true
+    setNotifications((current) => ({
+      ...current,
+      loadingMore: true,
+      error: null,
+    }))
+
+    try {
+      const page = await fetchNotifications({ before })
+      if (requestVersion !== notificationVersion.current) return
+
+      setNotifications((current) => {
+        const knownIds = new Set(current.items.map((item) => item.id))
+        return {
+          ...current,
+          items: [
+            ...current.items,
+            ...page.items.filter((item) => !knownIds.has(item.id)),
+          ],
+          nextCursor: page.nextCursor,
+          latestCursor: page.latestCursor,
+          readThroughCursor: page.readThroughCursor,
+          unreadCount: page.unreadCount,
+          loadingMore: false,
+          error: null,
+        }
+      })
+    } catch (error) {
+      if (requestVersion === notificationVersion.current) {
+        setNotifications((current) => ({
+          ...current,
+          loadingMore: false,
+          error: getApiErrorMessage(
+            error,
+            "Unable to load more notifications."
+          ),
+        }))
+      }
+    } finally {
+      notificationLoadingMore.current = false
+    }
+  }, [notifications.nextCursor])
+
+  const markAllNotificationsRead = useCallback(async () => {
+    const through = notifications.latestCursor
+    if (
+      sessionAccount === null ||
+      securityReady !== true ||
+      through === null ||
+      notifications.unreadCount === 0 ||
+      notifications.markingRead
+    ) {
+      return
+    }
+
+    const requestVersion = notificationVersion.current
+    setNotifications((current) => ({
+      ...current,
+      markingRead: true,
+      error: null,
+    }))
+
+    try {
+      const readState = await markNotificationsRead(through)
+      if (requestVersion !== notificationVersion.current) return
+
+      setNotifications((current) => ({
+        ...current,
+        items: current.items.map((item) => ({ ...item, read: true })),
+        readThroughCursor: readState.readThroughCursor,
+        unreadCount: readState.unreadCount,
+        markingRead: false,
+        error: null,
+      }))
+    } catch (error) {
+      if (requestVersion === notificationVersion.current) {
+        setNotifications((current) => ({
+          ...current,
+          markingRead: false,
+          error: getApiErrorMessage(
+            error,
+            "Unable to mark notifications as read."
+          ),
+        }))
+      }
+    }
+  }, [
+    notifications.latestCursor,
+    notifications.markingRead,
+    notifications.unreadCount,
+    securityReady,
+    sessionAccount,
+  ])
 
   const loadMore = useCallback(
     async (channel: Channel) => {
@@ -409,14 +588,21 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" })
   }, [])
 
+  const navigateNotifications = useCallback(() => {
+    window.history.pushState(null, "", "/notifications")
+    setRoute({ kind: "notifications" })
+    void refreshNotifications(sessionAccount)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }, [refreshNotifications, sessionAccount])
+
   const handleAccountChanged = useCallback(
     async (account: AccountProfile | null) => {
       setSessionAccount(account)
       setIdentityError(null)
-      await loadPosts()
+      await Promise.all([loadPosts(), refreshNotifications(account)])
       setProfileRefreshVersion((current) => current + 1)
     },
-    [loadPosts]
+    [loadPosts, refreshNotifications]
   )
 
   const handleProfileUpdated = useCallback(
@@ -452,15 +638,22 @@ export default function App() {
 
   useEffect(() => {
     function handlePopState() {
-      setRoute(readRoute())
+      const nextRoute = readRoute()
+      setRoute(nextRoute)
+      if (nextRoute.kind === "notifications") {
+        void refreshNotifications(sessionAccount)
+      }
     }
     window.addEventListener("popstate", handlePopState)
     return () => window.removeEventListener("popstate", handlePopState)
-  }, [])
+  }, [refreshNotifications, sessionAccount])
 
   useEffect(() => {
-    document.title =
-      route.kind === "profile" ? `@${route.handle} · Phark` : "Phark"
+    document.title = route.kind === "profile"
+      ? `@${route.handle} · Phark`
+      : route.kind === "notifications"
+        ? "Notifications · Phark"
+        : "Phark"
   }, [route])
 
   return (
@@ -489,7 +682,9 @@ export default function App() {
           <AccountControls
             account={sessionAccount}
             securityReady={securityReady}
+            unreadCount={notifications.unreadCount}
             onAccountChanged={handleAccountChanged}
+            onNavigateNotifications={navigateNotifications}
             onNavigateProfile={navigateProfile}
             onRetrySecurity={initializeIdentity}
           />
@@ -501,13 +696,35 @@ export default function App() {
         ) : null}
       </header>
 
-      <Composer
-        account={sessionAccount}
-        onAuthRequest={requestAuthentication}
-        onPostCreated={handlePostCreated}
-      />
+      {route.kind !== "notifications" ? (
+        <Composer
+          account={sessionAccount}
+          onAuthRequest={requestAuthentication}
+          onPostCreated={handlePostCreated}
+        />
+      ) : null}
 
-      {route.kind === "profile" ? (
+      {route.kind === "notifications" ? (
+        <NotificationView
+          authenticated={sessionAccount !== null}
+          items={notifications.items}
+          latestCursor={notifications.latestCursor}
+          unreadCount={notifications.unreadCount}
+          loading={notifications.loading}
+          loadingMore={notifications.loadingMore}
+          markingRead={notifications.markingRead}
+          error={notifications.error}
+          onBack={navigateHome}
+          onAuthRequest={requestAuthentication}
+          onNavigateProfile={navigateProfile}
+          onLoadMore={
+            notifications.nextCursor === null
+              ? null
+              : () => void loadMoreNotifications()
+          }
+          onMarkAllRead={() => void markAllNotificationsRead()}
+        />
+      ) : route.kind === "profile" ? (
         <ProfileView
           key={`${route.handle}:${profileRefreshVersion}`}
           handle={route.handle}

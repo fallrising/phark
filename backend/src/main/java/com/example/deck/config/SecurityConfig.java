@@ -86,6 +86,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.GET, "/api/notifications").authenticated()
                         .requestMatchers(HttpMethod.GET, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/accounts", "/api/auth/login")
                         .permitAll()
@@ -95,6 +96,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/posts/*/like").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/posts/*/like").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/posts/*/repost").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/notifications/read").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/posts/*/repost").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/profiles/me").authenticated()
                         .anyRequest().permitAll())

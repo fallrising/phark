@@ -162,6 +162,46 @@ original activity boundary。Frontend render key 與 load-more dedup 使用
 `timelineEntryId`；互動 patch（like/repost count/state）仍使用原文 `id` 讓所有
 visible copies 同步。
 
+V7 新增 `notifications` 與 `notification_read_state` 兩個 table。`notifications`
+以 `UNIQUE(reply_id)` 保證同一 reply 最多一筆事件，LIKE/REPOST 的取消後重建仍可
+寫入新事件（SQLite 允許多筆 null）；actor/recipient/post/reply 都使用
+`ON DELETE CASCADE` foreign keys。`notification_read_state` 以 account 為 primary
+key 保存 monotonic high-water `read_through_id`，不 foreign-key 到 notifications，
+retention 刪除 boundary row 不會破壞 read state。
+
+Reply/like/repost 的來源 mutation 與 notification insert/prune 在同一個
+`@Transactional` service 中（ReplyService 已補上 transaction；like/repost 沿用
+原有 transaction boundary），任一寫入失敗即整體 rollback。REPLY 事件只在 reply row
+建立後依原文 `author_account_id` 產生；LIKE/REPOST 事件只在 repository insert 真的
+建立新 relation 時產生（`ON CONFLICT DO NOTHING` 冪等重送不重複通知）。Self
+interaction 與 owner 為 null 的 legacy 文章不產生事件；unlike/unrepost 不撤回歷史
+事件，其後的新 PUT 是新的 interaction，會建立新事件與新 ID。
+
+Notification API 只服務 authenticated viewer：actor 是執行 reply/like/repost 的使用者，
+身份取自 `AccountPrincipal.accountId`；每筆通知的 recipient 是原文的
+`author_account_id`。每個收件者只能看到自己的通知（recipient isolation），
+`GET` response 明確設定 `Cache-Control: private, no-store`，security matcher 排在
+public `GET /**` permitAll 之前。Paging 使用 notification ID keyset（`id < beforeId`、
+`ORDER BY id DESC`、`LIMIT limit + 1`）；notification cursor 是獨立 codec 的
+canonical Base64URL `1:<id>` token，與 mixed timeline cursor 不互通。
+`readThroughId` 是 monotonic high-water mark：read mutation 使用
+`max(current, requested)`，較舊 cursor 不會讓已讀狀態倒退，且 cursor 必須 decode 成
+該收件者仍 retained 且 owned 的通知。`unreadCount` 只計算 retained rows 中
+`id > readThroughId` 的數量。
+
+Retention：每次成功插入通知後，同一 transaction 刪除該收件者第 501 筆及更舊 rows，
+只保留最新 500 筆；`idx_notifications_recipient_page (recipient_account_id, id DESC)`
+支援 recipient-scoped pagination/summary。Prune 不重寫 ID 也不降低
+`readThroughId`。V7 不回填既有 interactions，部署當下從 0 筆開始，之後每筆新互動
+產生事件。
+
+Frontend 新增 `/notifications` client route 與 header unread badge：badge 只在
+`unreadCount > 0` 顯示（上限 `99+`），session identity 載入或切換帳號後讀第一頁
+取得 badge，logout 立即清空 notification state，避免跨帳號短暫洩漏。「全部標為已讀」
+只在 latest cursor non-null 且有未讀時可按，成功後把目前已載入的所有 items 標為
+read，並套用 server 回傳的 `readThroughCursor` 與 `unreadCount`；失敗時不做
+optimistic clear，保留 badge 並顯示錯誤。本輪不 polling。
+
 HTTP session 是單 instance process memory，idle timeout 預設 30 分鐘；restart 或
 重新部署會登出所有使用者。這與 SQLite 的 replicas=1 限制一致，但不是 durable
 login。需要水平擴展時，shared session store 與 PostgreSQL 必須一起重新評估。
