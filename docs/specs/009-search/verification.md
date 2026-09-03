@@ -1,6 +1,6 @@
 # SDD-009 驗證紀錄
 
-> 狀態：In progress（implementation/runtime complete；CI/merge pending）
+> 狀態：Complete
 > Branch：`agent/search`
 > Base merge：`08adeabc96ae7e29a8800fe79731cd42bf846884`
 
@@ -15,11 +15,10 @@
 | `f6077c9` | Search service/controller、security/cache/error contract | 通過 |
 | `441ece1`、`2b5ac4c` | Typed client、SearchView、route/header/popstate | 通過 |
 | `566e2a2` | Search API、architecture、development、migration runbook 與 roadmap 文件 | 通過 |
-| This checkpoint | Production image、V7→V8、HTTP/JDBC/browser runtime evidence | 通過，含下述單一 UI limitation |
-| （待填充） | Final SDD status、54/54 孫任務、final-head CI 與 merge gate | 未執行 |
+| `435ce81` | Production image、V7→V8、HTTP/JDBC/browser runtime evidence | 通過，含下述單一 UI limitation |
+| This checkpoint | Final SDD status、54/54 孫任務、CI evidence 與 merge gate | 通過 |
 
-目前完成 5/6 stages、17/18 tasks、51/54 subtasks；只剩 F.3 的 push/CI/merge 三項，
-未執行的一律不標記為通過。
+完成 6/6 stages、18/18 tasks、54/54 subtasks。
 
 ## Required gates
 
@@ -33,8 +32,9 @@
 | Frontend lint/build | 通過（host + production image） | oxlint 0 warnings/errors；TypeScript/Vite 1,866 modules |
 | Multi-stage Docker build | 通過 | image `sha256:ade26bc0d179f46ccdd03c44c3879b652d338c394b71227868d4b9e41663c2ea` |
 | Production-like runtime | 通過（見 browser limitation） | clean/populated migration、FTS/trigger、query/page/auth/cache/SPA/session/interactions |
-| GitHub Actions final head | 未執行 | push/PR 後填入 run/job URL |
-| GitHub Actions post-merge `master` | 未執行 | merge 後填入 run/job URL |
+| GitHub Actions delivery head | 通過 | `435ce81` CI run `33763313507`；job `100674757694` |
+| GitHub Actions completion head | merge gate | 本 completion checkpoint push 後須通過才可 merge |
+| GitHub Actions post-merge `master` | delivery gate | merge 後須通過；run/job URL 記錄於 final handoff |
 
 ## Exact gates
 
@@ -154,10 +154,14 @@ Runtime 用真實 image、bind-mounted SQLite file、HTTP cookie/session 與 CSR
   未直接證實項；production build、code review、真實 backend 400/500 error path 與其餘 browser
   states 都有 evidence。這項限制不隱藏，也不誤報為通過。
 
-## Pending delivery evidence
+## GitHub delivery checkpoint evidence
 
-- Push all independent stage commits and create/maintain the draft PR。
-- Wait for the runtime-evidence head GitHub Actions run，then commit final 54/54 SDD status。
-- Wait for the final PR head CI，mark ready，merge，then wait for post-merge `master` CI。
-- Final handoff 必須提供 exact PR/merge SHA、final-head/post-merge run/job URL、remote master equality
-  與 clean worktree。
+- Runtime evidence checkpoint `435ce815aff4e5bce5a9cda855a2547c1268a83f` 已 push 至
+  draft PR #9，所有前置 stages 也保持獨立 commits。
+- GitHub Actions CI run `33763313507` 在該 head 通過；`Build container image` job
+  `100674757694` 於 1m12s 完成。詳情 URL：
+  `https://github.com/fallrising/phark/actions/runs/33763313507/job/100674757694`。
+- 本 completion checkpoint 只固化狀態、54/54 任務與上述已通過 evidence；push 後仍必須
+  等 PR head 自身的同一 CI workflow 通過，才將 PR 轉 ready 並 merge。Merge 後也必須等待
+  `master` workflow 通過；final handoff 記錄兩次 run/job URL、merge SHA、remote equality 與
+  clean worktree。

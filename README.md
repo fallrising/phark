@@ -123,5 +123,5 @@ Browser client 啟動時先並行取得 CSRF token 與 session，所有 `POST`�
 - [x] Per-account 冪等 likes 與 optimistic UI
 - [x] Per-account 冪等 reposts、original attribution 與 mixed timeline fan-out
 - [x] Per-account 通知中心與 unread badge
-- [ ] Original post 全文搜尋（FTS5、`s1:` cursor 與 `/search` 已實作；production delivery 驗證 pending）
+- [x] Original post 全文搜尋（FTS5、`s1:` cursor 與 `/search`）
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）

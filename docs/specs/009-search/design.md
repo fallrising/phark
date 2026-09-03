@@ -1,6 +1,6 @@
 # 009：公開文章搜尋設計
 
-> 狀態：Draft（living design，隨實作更新）
+> 狀態：Complete
 
 ## 邊界與資料流
 
@@ -26,7 +26,7 @@ Matching 用 FTS5、ordering 用 posts keyset；兩者分離，避免 rank 漂�
 
 ## Schema V8
 
-SQLite 下一個 immutable migration 是 `V8__add_search.sql`，支援 empty 與 populated V7 upgrade。
+SQLite immutable migration `V8__add_post_search.sql` 支援 empty 與 populated V7 upgrade。
 
 ```sql
 -- External-content FTS5 over posts.content; original post content only (replies stay in

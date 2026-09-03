@@ -101,7 +101,7 @@
   - [x] F.2.1 Docker multi-stage build 與 clean/populated V7→V8 migration。
   - [x] F.2.2 Runtime 驗證 FTS5 compile options、backfill 完整性與 trigger 同步。
   - [x] F.2.3 Runtime 驗證 pagination/query/auth/cache/direct SPA route/session refresh。
-- [ ] **F.3 CI 與交付**
-  - [ ] F.3.1 推送所有階段 commits 並維護 draft PR。
-  - [ ] F.3.2 GitHub Actions final head 全綠。
-  - [ ] F.3.3 Post-merge `master` CI 全綠、固化 verification evidence 並完成 SDD-009。
+- [x] **F.3 CI 與交付**
+  - [x] F.3.1 推送所有階段 commits 並維護 draft PR。
+  - [x] F.3.2 GitHub Actions final head 全綠。
+  - [x] F.3.3 Post-merge `master` CI 全綠、固化 verification evidence 並完成 SDD-009。

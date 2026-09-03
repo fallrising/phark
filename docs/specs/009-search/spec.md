@@ -1,13 +1,13 @@
 # 009：公開文章搜尋
 
-> 狀態：Draft
+> 狀態：Complete
 > 日期：2026-09-03
 
 ## 問題
 
 Phark 已有 timeline、replies、likes、reposts 與 notifications，但沒有搜尋。使用者無法依內容找到
-既有文章。SDD-008 之後，SQLite FTS5 已隨 sqlite-jdbc 3.53.2.0 編入（T-001 以 binary inspection
-初步驗證，尚未在 production runtime 複驗），可以建立全文索引而不新增 dependency。搜尋是多步驟
+既有文章。SDD-008 之後，SQLite FTS5 已隨 sqlite-jdbc 3.53.2.0 編入，並由 production image
+runtime 確認 SQLite 3.53.2 與 `ENABLE_FTS5`，可以建立全文索引而不新增 dependency。搜尋是多步驟
 的 user-visible change：需要新的 migration、query/cursor 契約、API 與 frontend route，因此先以
 live spec 固定契約再實作（documentation-first）。
 

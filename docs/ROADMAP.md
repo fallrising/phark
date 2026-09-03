@@ -46,11 +46,10 @@
 
 ## P2：探索與營運
 
-- [~] **SDD-009 — Search**
+- [x] **SDD-009 — Search**
   - [x] SQLite FTS5 index
   - [x] cursor-paginated results
   - [x] query limits
-  - （parent 維持進行中：Docker/runtime、final-head/post-merge CI 與 merge 的 production delivery 驗證 pending，通過後才標記完成）
 - [ ] **SDD-010 — Media attachments**
   - [ ] object storage abstraction
   - [ ] upload validation
