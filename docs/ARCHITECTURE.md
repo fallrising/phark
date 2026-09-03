@@ -246,6 +246,55 @@ load-more，結果 render 復用 `PostCard`（authenticated reply/like/repost �
 response 一律丟棄；account/session 改變（含 logout）以新（或 anonymous）viewer 身份
 重跑目前 query，logout 不 disabled 或清掉有效 public search route。
 
+### V9（SDD-010 media attachments）：metadata 與 bytes 分離
+
+V9 新增 one-to-one `post_images` metadata table（`post_id NOT NULL UNIQUE`、FK
+`posts(id) ON DELETE CASCADE`、`storage_key NOT NULL UNIQUE`、strict CHECK 的
+content_type/byte_size/width/height/sha256 與 `width * height <= 12000000`）。
+SQLite **只存 metadata、不存 blob**：image bytes 一律落在 `${APP_MEDIA_PATH}`
+（local `./data/media`、prod `/data/media`）。`sha256` 與 `storage_key` 是**內部**
+欄位，永不進入 public JSON。V9 **不回填**：既有 V1–V8 posts 的 `image` 都是 null，
+部署當下 `post_images` 為空。完整 schema、升級/降級與資料完整性程序見
+[docs/MIGRATIONS.md](MIGRATIONS.md) 的 V9 段落；規格見
+[docs/specs/010-media-attachments/spec.md](specs/010-media-attachments/spec.md) 與
+[design.md](specs/010-media-attachments/design.md)。
+
+**MediaStorage（byte-only boundary）**：`MediaStorage` interface 只暴露
+`store(bytes, validatedExtension) -> storageKey`、`read(storageKey) -> bytes`、
+`delete(storageKey)`，永不洩漏 `Path`、永不接受 client filename。`LocalMediaStorage`
+是唯一 adapter：server-generated lowercase UUID-v4 storage key、whole-root 的
+normalized-path/symlink/path-escape defense、temp file + `ATOMIC_MOVE`，都封裝在
+adapter 內，不流入 service/controller/public contract。
+
+**File-first、transaction later**：image validation（declared/detected type、magic
+bytes、`ImageIO` 先讀 dimensions 驗過 pixel 界線才完整 decode、5 MiB bounded read）
+與 file write 都發生在 short SQLite transaction 之前；post + metadata 以同一
+transaction 原子 commit。commit 失敗 → compensating `delete(storageKey)`；crash-gap
+（atomic move 成功後、commit 前）只會留下無 DB row 的 private orphan，由 stopped-app
+reconciliation 清理。DB row 永遠不會先於檔案存在或暴露。
+
+**Metadata-first read + integrity**：`GET /api/media/{id}` 先以正整數 metadata ID 查
+`post_images`，再 `read(storageKey)`，serving 前驗證實際 byte length 與
+`sha256(bytes)` 都與 metadata 一致。metadata 缺失 → `404 MEDIA_NOT_FOUND`；storage
+遺失 / byte length 或 SHA-256 不符 / 損壞 → `500 INTERNAL_ERROR`（log 完整，public
+body 不含內部路徑、storage key 或 SHA 值）。
+
+**Public immutable media-ID URL**：一個 media ID 永遠只對應一組初次寫入的 stored
+bytes，因此回應是 `Cache-Control: public, max-age=31536000, immutable`；
+`Content-Disposition` 的 `filename` 依 public ID + canonical type 產生
+（`image-<mediaId>.jpg|png`），永不使用 storage key 或 client filename。Create 的
+multipart 分支與既有 JSON 分支是兩支 `@PostMapping`、依 `consumes` 分派；auth +
+CSRF 與既有一致（Session + CSRF），media GET 維持在既有 `GET /**` permitAll matcher
+之下、不新增 authenticated matcher。
+
+**Deployment boundary**：維持單一 `/data` volume（`deck.db` metadata + `/data/media`
+bytes）與 read-only root FS，prod 設定 `APP_MEDIA_PATH=/data/media`。Backup/restore/
+migration 把 stopped SQLite 檔案與 media directory 視為**同一個 release snapshot**；
+orphan reconciliation 是 stopped-app 的 runbook，DB 層不負責刪檔。完整操作程序見
+[docs/MIGRATIONS.md](MIGRATIONS.md) 的 media snapshot/restore/reconciliation 與
+[docs/DEPLOYMENT.md](DEPLOYMENT.md) 的步驟 5/6；本節只記錄決策與 boundary，不重複
+runbook 內容。
+
 HTTP session 是單 instance process memory，idle timeout 預設 30 分鐘；restart 或
 重新部署會登出所有使用者。這與 SQLite 的 replicas=1 限制一致，但不是 durable
 login。需要水平擴展時，shared session store 與 PostgreSQL 必須一起重新評估。
