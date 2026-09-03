@@ -2,7 +2,7 @@
 
 > 原則：每個階段獨立 commit 並推送；行為變更遵循 RED → GREEN → REFACTOR。
 > 共 6 階段、18 個可驗證任務、54 個孫任務。
-> Scaffold checkpoint：Stage A（9/9 孫任務）完成；B–F 待實作。
+> Local/runtime checkpoint：Stage A–E 與 F.1/F.2 完成；F.3 CI/merge 待驗證。
 > REWORK 1 已併回：必要 `timelineEntryId`、UUID key、immutable media-ID URL、`image-<id>.jpg|png`
 > disposition、內部 lowercase 64-hex SHA-256、byte-oriented `MediaStorage`（不洩漏 `Path`）、
 > 兩支 `consumes` `@PostMapping`、`VALIDATION_FAILED` vs `MALFORMED_REQUEST` 分流、
@@ -89,32 +89,32 @@
 
 ## D：Multipart create 與 media read HTTP API
 
-- [ ] **D.1 RED — CreatePost multipart contract**
-  - [ ] D.1.1 測試 multipart POST /api/posts（`consumes=multipart/form-data` handler）：
+- [x] **D.1 RED — CreatePost multipart contract**
+  - [x] D.1.1 測試 multipart POST /api/posts（`consumes=multipart/form-data` handler）：
     required JSON `post` part + `image` part 成功回 201 且 Post 含 non-null image object。
-  - [ ] D.1.2 測試 multipart 缺 `post`/`image` part（→`MALFORMED_REQUEST`，含
+  - [x] D.1.2 測試 multipart 缺 `post`/`image` part（→`MALFORMED_REQUEST`，含
     `handleMissingServletRequestPart`）、`post` JSON malformed → `MALFORMED_REQUEST`；`post`
     內容不合規 → `VALIDATION_FAILED`；JSON handler 行為不變。
-  - [ ] D.1.3 測試 image too large（service-level bounded read 與 multipart resolver
+  - [x] D.1.3 測試 image too large（service-level bounded read 與 multipart resolver
     rejection `MaxUploadSizeExceededException`）統一 `413 IMAGE_TOO_LARGE`，不變成 500；
     resolver max-file 5 MiB / max-request 6 MiB。
-- [ ] **D.2 RED — Media read/security/cache contract**
-  - [ ] D.2.1 測試 `GET /api/media/{id}`：metadata lookup first、serving 前 byte length 與
+- [x] **D.2 RED — Media read/security/cache contract**
+  - [x] D.2.1 測試 `GET /api/media/{id}`：metadata lookup first、serving 前 byte length 與
     SHA-256 驗證、canonical type/length、`inline; filename="image-<id>.jpg|png"`、200。
-  - [ ] D.2.2 測試 invalid media ID（type mismatch 與 ≤0）→ `INVALID_MEDIA_ID`、metadata
+  - [x] D.2.2 測試 invalid media ID（type mismatch 與 ≤0）→ `INVALID_MEDIA_ID`、metadata
     缺失 → 404 `MEDIA_NOT_FOUND`、storage missing/byte length 或 SHA mismatch/corrupt →
     500 `INTERNAL_ERROR`（log 完整，body 無內部細節）。
-  - [ ] D.2.3 測試 `Cache-Control: public, max-age=31536000, immutable`、public matcher 不擋
+  - [x] D.2.3 測試 `Cache-Control: public, max-age=31536000, immutable`、public matcher 不擋
     anonymous、create 的 authenticated+CSRF 不變、public JSON 不含 sha256/storage
     key/client filename。
-- [ ] **D.3 GREEN/REFACTOR — Service/controller wiring**
-  - [ ] D.3.1 實作 `PostService` multipart create（validate→bounded read→write→post+metadata
+- [x] **D.3 GREEN/REFACTOR — Service/controller wiring**
+  - [x] D.3.1 實作 `PostService` multipart create（validate→bounded read→write→post+metadata
     單一 transaction→compensating delete）與 media read service（length+SHA 驗證）。
-  - [ ] D.3.2 實作兩支 `consumes` `@PostMapping` handlers、`MediaController`、新增
+  - [x] D.3.2 實作兩支 `consumes` `@PostMapping` handlers、`MediaController`、新增
     `ApiErrorCode`（`INVALID_IMAGE`、`IMAGE_TOO_LARGE`、`INVALID_MEDIA_ID`、
     `MEDIA_NOT_FOUND`）、`handleMissingServletRequestPart`、type-mismatch `mediaId` 與 cache
     header。
-  - [ ] D.3.3 執行 focused create/read/security/error 與完整 backend suite。
+  - [x] D.3.3 執行 focused create/read/security/error 與完整 backend suite。
 
 ## E：Frontend media compose 與 rendering
 
@@ -141,20 +141,20 @@
 
 ## F：文件與整合交付
 
-- [ ] **F.1 開發/營運文件**
-  - [ ] F.1.1 記錄 multipart create（兩支 `consumes` handler）、`Post.image` JSON、`GET
+- [x] **F.1 開發/營運文件**
+  - [x] F.1.1 記錄 multipart create（兩支 `consumes` handler）、`Post.image` JSON、`GET
     /api/media` 契約與 4 個新 error codes。
-  - [ ] F.1.2 記錄 V9 upgrade/backup/rollback：stopped SQLite + media directory 單一 release
+  - [x] F.1.2 記錄 V9 upgrade/backup/rollback：stopped SQLite + media directory 單一 release
     snapshot、`APP_MEDIA_PATH`、cascade 只刪 metadata、crash-gap stopped-app
     reconciliation/runbook。
-  - [ ] F.1.3 更新 architecture、development、roadmap、Dockerfile/deploy（`APP_MEDIA_PATH`、
+  - [x] F.1.3 更新 architecture、development、roadmap、Dockerfile/deploy（`APP_MEDIA_PATH`、
     read-only root FS、單一 `/data` volume）與 SDD evidence。
-- [ ] **F.2 Production-like validation**
-  - [ ] F.2.1 Docker multi-stage build 與 clean V1–V9、populated V8→V9 migration（count/ID
+- [x] **F.2 Production-like validation**
+  - [x] F.2.1 Docker multi-stage build 與 clean V1–V9、populated V8→V9 migration（count/ID
     preservation）。
-  - [ ] F.2.2 Runtime 驗證真實 multipart upload、binary read（含 byte length/SHA 驗證）、
+  - [x] F.2.2 Runtime 驗證真實 multipart upload、binary read（含 byte length/SHA 驗證）、
     restart persistence、immutable cache 與 413/error paths。
-  - [ ] F.2.3 Runtime 驗證 rollback（DB+media snapshot 還原）/path 限制與 browser UI（file
+  - [x] F.2.3 Runtime 驗證 rollback（DB+media snapshot 還原）/path 限制與 browser UI（file
     precheck、preview/cleanup、lazy image、alt）。
 - [ ] **F.3 CI 與交付**
   - [ ] F.3.1 推送所有階段 commits 並維護 draft PR。
