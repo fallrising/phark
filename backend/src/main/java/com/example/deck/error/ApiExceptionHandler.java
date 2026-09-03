@@ -1,6 +1,8 @@
 package com.example.deck.error;
 
 import com.example.deck.web.RequestIdFilter;
+import com.example.deck.service.ImageTooLargeException;
+import com.example.deck.service.InvalidImageException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +22,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -43,6 +47,31 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 ex.getDetail(),
                 RequestIdFilter.resolveRequestId(request));
         return new ResponseEntity<>(problem, code.getHttpStatus());
+    }
+
+    @ExceptionHandler(InvalidImageException.class)
+    public ResponseEntity<Object> handleInvalidImage(InvalidImageException ex, HttpServletRequest request) {
+        return problem(ApiErrorCode.INVALID_IMAGE, request);
+    }
+
+    @ExceptionHandler(ImageTooLargeException.class)
+    public ResponseEntity<Object> handleImageTooLarge(ImageTooLargeException ex, HttpServletRequest request) {
+        return problem(ApiErrorCode.IMAGE_TOO_LARGE, request);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+        ApiErrorCode code = ApiErrorCode.IMAGE_TOO_LARGE;
+        ProblemDetail problem = problemWriter.build(
+                code,
+                getRequestPath(request),
+                code.getDefaultDetail(),
+                resolveRequestId(request));
+        return handleExceptionInternal(ex, problem, headers, code.getHttpStatus(), request);
     }
 
     @Override
@@ -73,6 +102,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             code = switch (mex.getName()) {
                 case "limit" -> ApiErrorCode.INVALID_LIMIT;
                 case "postId" -> ApiErrorCode.INVALID_POST_ID;
+                case "mediaId" -> ApiErrorCode.INVALID_MEDIA_ID;
                 default -> ApiErrorCode.MALFORMED_REQUEST;
             };
         }
@@ -130,6 +160,21 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @Override
+    protected ResponseEntity<Object> handleMissingServletRequestPart(
+            MissingServletRequestPartException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+        ApiErrorCode code = ApiErrorCode.MALFORMED_REQUEST;
+        ProblemDetail problem = problemWriter.build(
+                code,
+                getRequestPath(request),
+                code.getDefaultDetail(),
+                resolveRequestId(request));
+        return handleExceptionInternal(ex, problem, headers, code.getHttpStatus(), request);
+    }
+
+    @Override
     protected ResponseEntity<Object> handleNoResourceFoundException(
             NoResourceFoundException ex,
             HttpHeaders headers,
@@ -154,6 +199,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 request.getRequestURI(),
                 code.getDefaultDetail(),
                 requestId);
+        return new ResponseEntity<>(problem, code.getHttpStatus());
+    }
+
+    private ResponseEntity<Object> problem(ApiErrorCode code, HttpServletRequest request) {
+        ProblemDetail problem = problemWriter.build(
+                code,
+                request.getRequestURI(),
+                code.getDefaultDetail(),
+                RequestIdFilter.resolveRequestId(request));
         return new ResponseEntity<>(problem, code.getHttpStatus());
     }
 

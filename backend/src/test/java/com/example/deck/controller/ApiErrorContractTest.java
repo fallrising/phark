@@ -37,7 +37,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -193,12 +195,36 @@ class ApiErrorContractTest {
     }
 
     @Test
+    void maxUploadSizeExceededReturnsImageTooLarge() throws Exception {
+        mockMvc.perform(get("/api/test/upload-too-large")
+                        .header("X-Request-ID", VALID_REQUEST_ID))
+                .andExpect(header().string("X-Request-ID", VALID_REQUEST_ID))
+                .andExpect(jsonPath("$.requestId").value(VALID_REQUEST_ID))
+                .andExpect(problemDetails(
+                        413, "image-too-large", "Image too large",
+                        "IMAGE_TOO_LARGE", "/api/test/upload-too-large"))
+                .andExpect(jsonPath("$.detail")
+                        .value("The uploaded image exceeds the maximum allowed size of 5 MiB."))
+                .andExpect(content().string(not(containsString("MaxUploadSizeExceededException"))))
+                .andExpect(content().string(not(containsString("Maximum upload size"))));
+    }
+
+    @Test
     void methodNotAllowedReturnsProblemDetails() throws Exception {
         mockMvc.perform(patch("/api/posts").with(csrf()))
                 .andExpect(problemDetails(
                         405, "method-not-allowed", "Method not allowed",
                         "METHOD_NOT_ALLOWED", "/api/posts"))
                 .andExpect(header().string(HttpHeaders.ALLOW, containsString("GET")))
+                .andExpect(jsonPath("$.detail").isString());
+    }
+
+    @Test
+    void invalidMediaIdNonNumericReturnsProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/test/media/abc"))
+                .andExpect(problemDetails(
+                        400, "invalid-media-id", "Invalid media ID",
+                        "INVALID_MEDIA_ID", "/api/test/media/abc"))
                 .andExpect(jsonPath("$.detail").isString());
     }
 
@@ -347,6 +373,15 @@ class ApiErrorContractTest {
                     "requestId", attr != null ? attr : "",
                     "mdcRequestId", mdc != null ? mdc : ""
             );
+        }
+
+        @GetMapping("/api/test/media/{mediaId}")
+        void media(@PathVariable long mediaId) {
+        }
+
+        @GetMapping("/api/test/upload-too-large")
+        void uploadTooLarge() {
+            throw new MaxUploadSizeExceededException(5L * 1024 * 1024);
         }
     }
 }
