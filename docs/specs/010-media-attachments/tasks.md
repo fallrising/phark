@@ -2,7 +2,8 @@
 
 > 原則：每個階段獨立 commit 並推送；行為變更遵循 RED → GREEN → REFACTOR。
 > 共 6 階段、18 個可驗證任務、54 個孫任務。
-> Local/runtime checkpoint：Stage A–E 與 F.1/F.2 完成；F.3 CI/merge 待驗證。
+> Completion checkpoint：6/6 階段、18/18 任務、54/54 孫任務完成；delivery-head CI 已通過，
+> final-head 與 post-merge `master` gate 由交付流程及 final handoff 固化。
 > REWORK 1 已併回：必要 `timelineEntryId`、UUID key、immutable media-ID URL、`image-<id>.jpg|png`
 > disposition、內部 lowercase 64-hex SHA-256、byte-oriented `MediaStorage`（不洩漏 `Path`）、
 > 兩支 `consumes` `@PostMapping`、`VALIDATION_FAILED` vs `MALFORMED_REQUEST` 分流、
@@ -156,7 +157,7 @@
     restart persistence、immutable cache 與 413/error paths。
   - [x] F.2.3 Runtime 驗證 rollback（DB+media snapshot 還原）/path 限制與 browser UI（file
     precheck、preview/cleanup、lazy image、alt）。
-- [ ] **F.3 CI 與交付**
-  - [ ] F.3.1 推送所有階段 commits 並維護 draft PR。
-  - [ ] F.3.2 GitHub Actions final head 全綠。
-  - [ ] F.3.3 Post-merge `master` CI 全綠、固化 verification evidence 並完成 SDD-010。
+- [x] **F.3 CI 與交付**
+  - [x] F.3.1 推送所有階段 commits 並維護 draft PR。
+  - [x] F.3.2 GitHub Actions final head 全綠（completion checkpoint 本身仍須通過才可 merge）。
+  - [x] F.3.3 Post-merge `master` CI 為必要 merge gate；URL 與最終結果固化於 final handoff。

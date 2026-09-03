@@ -1,6 +1,7 @@
 # SDD-010 驗證紀錄
 
-> 狀態：In Progress — local/runtime gates complete，等待 GitHub delivery/completion gates
+> 狀態：Complete — local/runtime 與 delivery-head gates complete；completion-head/post-merge
+> gate 由交付流程及 final handoff 固化
 > Branch：`agent/media-attachments`
 > Base merge：`e2c8e11330628baab457269ab21425fe22b5dc16`
 
@@ -19,10 +20,10 @@
 | `c987d55` | Multipart HTTP handlers、resolver/error contract | 通過 |
 | `0acdf6c` | Public API、development、architecture 文件 | 通過 |
 | `b48bda9` | Public media GET、headers/cache/security contract | 通過 |
-| This checkpoint | Production image、V7→V8→V9、API/search/restart/rollback/browser evidence | 通過 |
+| `56a187a` | Production image、V7→V8→V9、API/search/restart/rollback/browser evidence | 通過 |
 
-本 checkpoint 完成 Stage A–E 與 Stage F 的 local/runtime 部分；GitHub final-head 與
-post-merge `master` gates 由 completion checkpoint/final handoff 固化。
+Completion checkpoint 完成 6/6 stages、18/18 tasks、54/54 subtasks。Delivery-head CI 已通過；
+completion-head 與 post-merge `master` gates 仍是 merge 的硬條件，結果由 final handoff 固化。
 
 ## Required gates
 
@@ -38,7 +39,7 @@ post-merge `master` gates 由 completion checkpoint/final handoff 固化。
 | Frontend lint/build | 通過（host gate + production image） | oxlint 0 warnings/errors；Vite 1,866 modules |
 | Multi-stage Docker build | 通過 | image `sha256:6142ebd446ba3e428231d952a5e9bc8b06fe1d75753609a6650f77b8e401e926` |
 | Production-like runtime | 通過 | populated V7→V8→V9、upload/read/errors/search/restart/corrupt/rollback/browser |
-| GitHub Actions delivery head | pending | 本 checkpoint push 後執行 |
+| GitHub Actions delivery head | 通過 | [run 33789175602](https://github.com/fallrising/phark/actions/runs/33789175602)；[job 100761291430](https://github.com/fallrising/phark/actions/runs/33789175602/job/100761291430) |
 | GitHub Actions completion head | pending | completion checkpoint push 後執行 |
 | GitHub Actions post-merge `master` | delivery gate | merge 後執行，URL 記錄於 final handoff |
 
@@ -163,7 +164,9 @@ session，runtime 完成後已失效。
 
 ## GitHub delivery checkpoint
 
-本 local/runtime checkpoint push 後建立 draft PR，先等待 delivery-head CI。該 run 通過後，
-completion checkpoint 才會把 6/6 stages、18/18 tasks、54/54 subtasks 與 ROADMAP 狀態標為
-complete；completion head 自身也必須通過才可 merge。Merge 後另等 `master` workflow 通過；
-兩次最終 run/job URL、PR、merge SHA、remote equality 與 clean tree 記錄於 final handoff。
+Draft [PR #10](https://github.com/fallrising/phark/pull/10) 的 delivery head `56a187a` 通過
+[CI run 33789175602](https://github.com/fallrising/phark/actions/runs/33789175602)（
+[Build container image job 100761291430](https://github.com/fallrising/phark/actions/runs/33789175602/job/100761291430)）。
+本 completion checkpoint 將 6/6 stages、18/18 tasks、54/54 subtasks 與 ROADMAP 標為 complete；
+它自身的 final-head CI 必須通過才可 merge。Merge 後另等 `master` workflow 通過；final-head、
+post-merge run/job URL、merge SHA、remote equality 與 clean tree 記錄於 final handoff。

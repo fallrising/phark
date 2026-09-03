@@ -1,6 +1,6 @@
 # 010：媒體附件
 
-> 狀態：In Progress（scaffold checkpoint — 規格定案、實作未開始；REWORK 1 已併回）
+> 狀態：Complete（實作、local/runtime 與 delivery-head CI 已驗證）
 > 日期：2026-09-03
 > Baseline：`e2c8e11330628baab457269ab21425fe22b5dc16`
 

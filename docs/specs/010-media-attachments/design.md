@@ -1,6 +1,6 @@
 # 010：媒體附件設計
 
-> 狀態：In Progress（scaffold checkpoint；REWORK 1 已併回）
+> 狀態：Complete（實作、local/runtime 與 delivery-head CI 已驗證）
 
 ## 邊界與資料流
 

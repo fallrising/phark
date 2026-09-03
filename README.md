@@ -141,5 +141,5 @@ Browser client 啟動時先並行取得 CSRF token 與 session，所有 `POST`�
 - [x] Per-account 冪等 reposts、original attribution 與 mixed timeline fan-out
 - [x] Per-account 通知中心與 unread badge
 - [x] Original post 全文搜尋（FTS5、`s1:` cursor 與 `/search`）
-- [ ] 媒體附件（SDD-010：multipart create、公開 media GET、lazy rendering — local/runtime 完成，等待 CI/merge；見 [docs/specs/010-media-attachments/spec.md](docs/specs/010-media-attachments/spec.md)）
+- [x] 媒體附件（SDD-010：multipart create、公開 media GET、lazy rendering；見 [docs/specs/010-media-attachments/spec.md](docs/specs/010-media-attachments/spec.md)）
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）

@@ -50,7 +50,7 @@
   - [x] SQLite FTS5 index
   - [x] cursor-paginated results
   - [x] query limits
-- [~] **SDD-010 — Media attachments**（local/runtime 完成，等待 CI/merge）
+- [x] **SDD-010 — Media attachments**
   - [x] object storage abstraction
   - [x] upload validation
   - [x] image rendering
