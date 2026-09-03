@@ -13,18 +13,18 @@ phark/
 │       │   ├── java/com/example/deck/
 │       │   │   ├── DeckApplication.java
 │       │   │   ├── config/       # Database, migration, security 與 SPA config
-│       │   │   ├── controller/   # Auth、account、profile、post、reply、like、repost、notifications APIs
+│       │   │   ├── controller/   # Auth、account、profile、post、reply、like、repost、notifications、search APIs
 │       │   │   ├── dto/          # JSON request/response boundaries
 │       │   │   ├── error/        # RFC 9457 codes、exception mapper、violations
-│       │   │   ├── model/        # Account、profile、content、RepostState、NotificationPage/ReadState 契約
-│       │   │   ├── repository/   # Account/Post/Reply/PostLike/PostRepost/Notification JdbcClient repositories
+│       │   │   ├── model/        # Account、profile、content、RepostState、NotificationPage/ReadState、SearchCursor 契約
+│       │   │   ├── repository/   # Account/Post/Reply/PostLike/PostRepost/Notification/Search JdbcClient repositories
 │       │   │   ├── security/     # Principal、UserDetails 與 Problem writers
-│       │   │   ├── service/      # Account、Post、Reply、PostLike、PostRepost、Notification services
+│       │   │   ├── service/      # Account、Post、Reply、PostLike、PostRepost、Notification、Search services
 │       │   │   └── web/          # Request correlation filter
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       ├── application-prod.properties
-│       │       └── db/migration/  # Immutable Flyway V1...V7
+│       │       └── db/migration/  # Immutable Flyway V1...V8
 │       └── test/
 ├── frontend/                # React + TypeScript + Vite + shadcn/ui
 │   ├── package.json
@@ -35,7 +35,8 @@ phark/
 │       ├── api/accounts.ts  # Account/session/profile typed calls
 │       ├── api/posts.ts     # Post/reply/like/repost typed calls
 │       ├── api/notifications.ts # Notification page/read typed calls
-│       ├── components/      # Auth、profile、timeline、composer、notifications、ui/*
+│       ├── api/search.ts    # Search page typed calls
+│       ├── components/      # Auth、profile、timeline、composer、notifications、search、ui/*
 │       ├── lib/postReposts.ts  # repost snapshot/optimistic/rollback pure helpers
 │       └── types/post.ts
 ├── Dockerfile               # multi-stage build
@@ -61,6 +62,7 @@ phark/
 | Likes | 每帳號冪等 like/unlike、權威 count 與 optimistic rollback |
 | Reposts | 每帳號冪等 repost/unrepost、original attribution 與 mixed timeline fan-out |
 | Notifications | reply/like/repost 事件、unread badge、通知分頁與「全部標為已讀」 |
+| Search | public FTS5 original post 搜尋、`s1:` cursor 分頁、load-more dedupe |
 | 自動刷新 | 發文後三欄自動重新載入 |
 
 ## REST API
@@ -295,6 +297,90 @@ PUT /api/notifications/read
 - Anonymous 回 `401 AUTHENTICATION_REQUIRED`；缺 CSRF 或 token 無效回
   `403 CSRF_TOKEN_INVALID`，且不得改變 read state。
 
+### `GET /api/search`
+
+Public、viewer-aware 的 original post 全文搜尋（replies 不索引），回傳與 timeline 相同
+的 `PostPage` envelope（同一個 `Post` JSON shape：`timelineEntryId` 固定 `post:<id>`、
+repost attribution 恒為 null、boolean viewer flags 永不為 null）。排序固定為
+`(posts.created_at DESC, posts.id DESC)` 的確定性 keyset，不使用 OFFSET 或 FTS rank：
+
+```http
+GET /api/search?q=ship%20boring&limit=20&before=<opaque-search-cursor>
+```
+
+| 參數 | 預設 | 規則 |
+|------|------|------|
+| `q` | 必填 | plain terms；trim 後 1–100 個 Unicode code points、1–8 個 terms，每 term 至少一個 Unicode letter/digit；不接受 whitespace 以外的 ISO control |
+| `limit` | `20` | `1..50`（僅 search 端點，與 timeline/replies/notifications 的 `1..100` 不同） |
+| `before` | — | 上一頁的 search `nextCursor`；opaque，client 不解析 |
+
+`q` 以 nullable `@RequestParam` 綁定後交由 service 驗證，缺漏回 `INVALID_QUERY`。
+編譯器把每個完整 term 包成 FTS5 quoted phrase（內含 `"` 以 `""` escape）再以 `AND`
+join，例如 plain `ship the` → `"ship" AND "the"`；quoting 讓 `NOT`/`OR`/`AND`/`NEAR`/
+`(`/`)`/`^`/`:col` 不成 operator、`foo*` 不成 prefix，只把 input 當結構中性的
+phrase；`unicode61` tokenizer 則把 `*` 這類 punctuation 視為 separator，不是可搜尋的
+literal 資料。compiled string 一律以 bound `MATCH` parameter 傳入。結果：
+
+```json
+{
+  "items": [
+    {
+      "id": 42,
+      "timelineEntryId": "post:42",
+      "author": "Alice",
+      "authorHandle": "alice_ops",
+      "content": "Ship the boring fix first.",
+      "channel": "tech",
+      "createdAt": "2026-09-02T10:00:00Z",
+      "replyCount": 0,
+      "likeCount": 3,
+      "likedByViewer": false,
+      "repostCount": 1,
+      "repostedByViewer": false,
+      "repostedBy": null,
+      "repostedByHandle": null,
+      "repostedAt": null
+    }
+  ],
+  "nextCursor": "<opaque search cursor>"
+}
+```
+
+- `nextCursor` 非 null 時作為下一頁的 `before`；cursor 是 search 專屬 codec 的
+  canonical no-padding Base64URL payload **`s1:<epoch-second>:<positive-id>`**，只當
+  ordering boundary，不驗證該 post 是否仍存在或 ownership。Malformed、non-canonical、
+  overflow、plus sign/`-0`/leading zero、非 search namespace（legacy timeline
+  `1:<epoch>:<id>`、timeline v2 `2:<epoch>:<kind>:<id>`、notification `1:<id>`）一律回
+  `400 INVALID_CURSOR`，且無 side effect。
+- 相同 `created_at` 的 post 以 `id DESC` tiebreak，保證跨頁不重複、不缺漏；repository
+  讀 `limit + 1` rows 判斷 hasMore。
+- `likedByViewer`/`repostedByViewer` 依目前 session 計算，anonymous 為 boolean
+  `false`（非 null）。Response 一律 `Cache-Control: private, no-store`，不可放進共享
+  cache。
+- 意外的 FTS/repository operational failure 回 `INTERNAL_ERROR` 並 log，不廣義映射成
+  `INVALID_QUERY`。
+
+V8 (SDD-009) 在 `V8__add_post_search.sql` 建立 external-content FTS5 virtual table
+`search_posts`（`content='posts'`、`content_rowid='id'`、
+`tokenize='unicode61 remove_diacritics 2'`）、migration-time `rebuild` 回填與三個
+same-transaction trigger（`posts_search_ai`/`posts_search_ad`/`posts_search_au`，
+UPDATE 以 `AFTER UPDATE OF content` 限定），replies 不索引。
+
+### Frontend Search
+
+- `api/search.ts` 提供 typed `fetchSearch(query, { before, limit })`，復用既有
+  `PostPage` type，不建立同形 page type；search 是 safe GET，沿用 same-origin cookie
+  與 in-memory CSRF client。
+- App 新增 `{ kind: "search" }` route 與 `/search?q=...` path parser；header 的 Search
+  entry 與 `/search` 頁內表單把 query 帶入 route，支援 direct load、nav 與 popstate，
+  每個 route 有對應 title。
+- `SearchView` 以 post id append/dedup、保存 next cursor、顯示 loading/empty/error 與
+  Load more；結果 render 復用 `PostCard`，authenticated reply/like/repost 互動沿用既有
+  工具，不新增 dependency。
+- Query/route/account 改變時 bump request version，stale response 一律丟棄；account/
+  session 改變（含 logout）以新 viewer 身份重跑目前 query，logout 以 anonymous 重跑
+  有效 public route、不 disabled 也不清掉 query。
+
 ### Notifications 事件寫入與 retention
 
 Notification 不另外建立 event bus：reply、like、repost 的來源 mutation 與
@@ -391,8 +477,9 @@ members 必須忽略。
 |------|------|------|
 | `VALIDATION_FAILED` | 400 | request body 欄位 constraint 失敗 |
 | `INVALID_CHANNEL` | 400 | channel 不在允許清單 |
-| `INVALID_LIMIT` | 400 | limit 不是整數或不在 1–100 |
-| `INVALID_CURSOR` | 400 | timeline/replies/notifications cursor 不合法 |
+| `INVALID_QUERY` | 400 | 搜尋 `q` 缺失或違反 plain-term 規則（trim 後 1–100 code points、1–8 terms、每 term 至少一個 Unicode letter/digit） |
+| `INVALID_LIMIT` | 400 | limit 不是整數或超出範圍（timeline/replies/notifications 為 1–100；search 為 1–50） |
+| `INVALID_CURSOR` | 400 | timeline、replies、notifications、search 的 cursor 不合法或 namespace 不符 |
 | `INVALID_POST_ID` | 400 | post ID 不是正整數 |
 | `MALFORMED_REQUEST` | 400 | request body 缺失、語法錯誤或無法讀取 |
 | `INVALID_CREDENTIALS` | 401 | 登入失敗；不區分 handle 或 password 原因 |
@@ -570,7 +657,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 | 範圍 | 命令 | 覆蓋 |
 |------|------|------|
-| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content/likes/reposts、mixed timeline/cursor、notifications、migration、errors |
+| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content/likes/reposts、mixed timeline/cursor、notifications、migration（含 V8 FTS rebuild/trigger）、search compiler/cursor/repository/controller/errors |
 | Frontend lint | `npm run lint`（在 `frontend/`） | oxlint |
 | Frontend build | `npm run build`（在 `frontend/`） | TypeScript + Vite |
 | 整合 | `docker build -t stream-deck .` | 含 frontend lint/build + Maven test |

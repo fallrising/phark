@@ -1,6 +1,6 @@
 # 架構與技術決策
 
-> 最後更新：2026-09-02
+> 最後更新：2026-09-03
 
 本專案目標是在**閒置 VPS** 上建立一條**單機、可重現、可回滾**的部署路徑，**不碰 Kubernetes**。
 
@@ -201,6 +201,50 @@ Frontend 新增 `/notifications` client route 與 header unread badge：badge �
 只在 latest cursor non-null 且有未讀時可按，成功後把目前已載入的所有 items 標為
 read，並套用 server 回傳的 `readThroughCursor` 與 `unreadCount`；失敗時不做
 optimistic clear，保留 badge 並顯示錯誤。本輪不 polling。
+
+V8（SDD-009 search）新增 `search_posts`：一個 **external-content FTS5 virtual table**，
+索引來源是 `posts.content`（original post content only；replies 留在 `replies` table，
+**不索引**）。以 `content='posts'`、`content_rowid='id'` 宣告 external content，FTS 只
+保存 index 與 mirror `posts.id` 的 rowid，內容以 `posts` 為真值；
+`tokenize='unicode61 remove_diacritics 2'`。Migration 內緊接 `INSERT INTO
+search_posts(search_posts) VALUES('rebuild')` 做 **migration-time rebuild**，把全部既有
+original posts 立即索引（explicit backfill，與 SDD-008 的 no-backfill 決策相反，因 FTS
+冷啟動無法配對）。三個 trigger 與 posts mutation **同一 transaction**，任一 trigger
+失敗即 rollback post 寫入（fail-closed）：`posts_search_ai` AFTER INSERT、
+`posts_search_ad` AFTER DELETE、`posts_search_au` **AFTER UPDATE OF content**（delete +
+insert 覆寫 content 變更）。Search 的 keyset timestamp 一律由 source-of-truth `posts`
+join 取得，FTS index 不複製 created_at。
+
+`GET /api/search` 維持 **public viewer-aware**（在既有 `GET /**` permitAll 之下、
+matcher 不擋 anonymous）：`SearchService` 用 `@Transactional(readOnly = true)`，先以
+`SearchQueryCompiler` 把 plain terms 編譯成 **bound `MATCH` parameter**。Compiler 只
+接受 trim 後 1–100 code points、1–8 terms、每 term 至少一個 Unicode letter/digit 的
+輸入，把每個完整 term 包成 FTS5 quoted phrase（quote 以 `""` escape），再以 `AND`
+join；quoting 讓 `NOT`/`OR`/`AND`/`NEAR`/`(`/`)`/`^`/`:col` 不成 operator、`foo*`
+不成 prefix；`unicode61` tokenizer 則把 `*` 這類 punctuation 視為 separator，不是可
+搜尋的 literal 資料。全部值都是 bound parameter，永不 string-concatenation。其他
+FTS/operational unexpected failure 回 `INTERNAL_ERROR` 並
+log，不廣義映射成 `INVALID_QUERY`。
+
+分頁是確定性 keyset：排序 `(posts.created_at DESC, posts.id DESC)`，repository 讀
+`limit + 1` rows，由最後一筆 delivered row 產生 next cursor。Cursor 是 search 專屬
+codec 的 canonical **no-padding Base64URL payload `s1:<epoch-second>:<positive-id>`**，
+`epoch-second` 是 UTC signed epoch seconds（canonical decimal，拒絕 plus sign、`-0`、
+leading zero），`id` > 0；與 legacy timeline `1:<epoch>:<id>`、timeline v2
+`2:<epoch>:<kind>:<id>`、notification `1:<id>` byte-distinct，不接受其他 namespace。
+Cursor 只當 ordering boundary，不驗證 post 存在或 ownership。`limit` 預設 20、範圍
+1–50（僅 search 端點，與 timeline/replies/notifications 的 1–100 不同）。
+
+Response 復用既有 `PostPage` 與 `Post` JSON shape（不發明第二種 shape）：每個 item 都
+是 original row，`timelineEntryId` 固定 `post:<id>`，repost attribution 恒為 null；
+`likedByViewer`/`repostedByViewer` 是 boolean（anonymous 為 false、永不 null）。
+Controller 明確設定 `Cache-Control: private, no-store`，viewer-aware payload 不可被
+browser/CDN 快取。Frontend 新增 typed `api/search.ts` 與 `/search` SPA route：
+`SearchView` 以 post id append/dedup、保存 next cursor、顯示 loading/empty/error 與
+load-more，結果 render 復用 `PostCard`（authenticated reply/like/repost 互動沿用既有
+工具，不新增 dependency）。Query/route/account 改變時 bump request-version，stale
+response 一律丟棄；account/session 改變（含 logout）以新（或 anonymous）viewer 身份
+重跑目前 query，logout 不 disabled 或清掉有效 public search route。
 
 HTTP session 是單 instance process memory，idle timeout 預設 30 分鐘；restart 或
 重新部署會登出所有使用者。這與 SQLite 的 replicas=1 限制一致，但不是 durable

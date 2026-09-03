@@ -17,6 +17,7 @@
 | [specs/006-post-likes/](./specs/006-post-likes/) | 冪等 post likes、viewer-aware count 與 optimistic UI |
 | [specs/007-post-reposts/](./specs/007-post-reposts/) | Repost attribution、mixed timeline fan-out 與相容 cursor |
 | [specs/008-notifications/](./specs/008-notifications/) | 帳號通知的規格、設計、任務與驗證 |
+| [specs/009-search/](./specs/009-search/) | 公開文章搜尋的規格、設計、任務樹與驗證 |
 
 ## 部署模板
 
