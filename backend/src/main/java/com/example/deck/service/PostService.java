@@ -7,23 +7,42 @@ import com.example.deck.model.Post;
 import com.example.deck.model.PostCursor;
 import com.example.deck.model.PostPage;
 import com.example.deck.model.TimelinePost;
+import com.example.deck.model.ValidatedImage;
 import com.example.deck.repository.PostRepository;
 import jakarta.annotation.PostConstruct;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class PostService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(PostService.class);
 
     private static final Set<String> VALID_CHANNELS = Set.of("home", "tech", "ops");
 
     private final PostRepository postRepository;
     private final PostCursorCodec cursorCodec;
+    private final ImageValidator imageValidator;
+    private final MediaStorage mediaStorage;
+    private final PostImagePersistenceService postImagePersistenceService;
 
-    public PostService(PostRepository postRepository, PostCursorCodec cursorCodec) {
+    public PostService(
+            PostRepository postRepository,
+            PostCursorCodec cursorCodec,
+            ImageValidator imageValidator,
+            MediaStorage mediaStorage,
+            PostImagePersistenceService postImagePersistenceService) {
         this.postRepository = postRepository;
         this.cursorCodec = cursorCodec;
+        this.imageValidator = imageValidator;
+        this.mediaStorage = mediaStorage;
+        this.postImagePersistenceService = postImagePersistenceService;
     }
 
     public PostPage getPosts(String channel, int limit, String before) {
@@ -91,6 +110,48 @@ public class PostService {
     public Post createPost(long accountId, CreatePostRequest request) {
         return postRepository.insertOwned(
                 accountId, request.content().trim(), request.channel());
+    }
+
+    /**
+     * Multipart create path: validation and the single defensive byte copy land
+     * in storage before any database work; the atomic post + metadata insert runs
+     * in the proxied {@link PostImagePersistenceService} transaction. Any
+     * transaction invocation failure triggers a compensating delete of the stored
+     * bytes; a failed cleanup is logged and suppressed so it never masks the
+     * primary failure.
+     */
+    public Post createPostWithImage(
+            long accountId, CreatePostRequest request, MultipartFile image) {
+        ValidatedImage validated = validateImage(image);
+        String storageKey = mediaStorage.store(validated.bytes(), validated.extension());
+        try {
+            return postImagePersistenceService.createOwnedWithImage(
+                    accountId,
+                    request.content().trim(),
+                    request.channel(),
+                    storageKey,
+                    validated);
+        } catch (RuntimeException failure) {
+            compensate(storageKey, failure);
+            throw failure;
+        }
+    }
+
+    private ValidatedImage validateImage(MultipartFile image) {
+        try (InputStream input = image.getInputStream()) {
+            return imageValidator.validate(image.getContentType(), input);
+        } catch (IOException exception) {
+            throw new InvalidImageException();
+        }
+    }
+
+    private void compensate(String storageKey, RuntimeException failure) {
+        try {
+            mediaStorage.delete(storageKey);
+        } catch (RuntimeException cleanupFailure) {
+            LOGGER.warn("Failed to clean up stored media after create failure", cleanupFailure);
+            failure.addSuppressed(cleanupFailure);
+        }
     }
 
     @PostConstruct
