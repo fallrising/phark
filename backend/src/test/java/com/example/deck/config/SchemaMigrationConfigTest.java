@@ -7,6 +7,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -222,12 +223,121 @@ class SchemaMigrationConfigTest {
                 .satisfies(t -> assertThat(t.getMessage()).isNotNull());
     }
 
+    private boolean schemaObjectExists(String type, String name) throws Exception {
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(
+                        "SELECT COUNT(*) FROM sqlite_master WHERE type='" + type + "' AND name='" + name + "'")) {
+            return rs.next() && rs.getInt(1) > 0;
+        }
+    }
+
+    private String schemaObjectSql(String type, String name) throws Exception {
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(
+                        "SELECT sql FROM sqlite_master WHERE type='" + type + "' AND name='" + name + "'")) {
+            assertThat(rs.next()).isTrue();
+            return rs.getString(1);
+        }
+    }
+
+    private List<String> schemaObjectNames(String type) throws Exception {
+        List<String> names = new ArrayList<>();
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(
+                        "SELECT name FROM sqlite_master WHERE type='" + type + "' ORDER BY name")) {
+            while (rs.next()) {
+                names.add(rs.getString(1));
+            }
+        }
+        return names;
+    }
+
+    private List<String> triggerNames() throws Exception {
+        return schemaObjectNames("trigger");
+    }
+
+    private List<String> postSearchTriggerNames() throws Exception {
+        List<String> names = new ArrayList<>();
+        for (String name : triggerNames()) {
+            if (name.startsWith("posts_search_")) {
+                names.add(name);
+            }
+        }
+        return names;
+    }
+
+    private String integrityCheck() throws Exception {
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery("PRAGMA integrity_check")) {
+            assertThat(rs.next()).isTrue();
+            return rs.getString(1);
+        }
+    }
+
+    private void assertSearchFtsIntegrity() throws Exception {
+        try (Connection conn = DriverManager.getConnection(url);
+                Statement stmt = conn.createStatement()) {
+            stmt.execute(
+                    "INSERT INTO search_posts(search_posts, rank) VALUES('integrity-check', 1)");
+        }
+    }
+
+    private long searchMatchCount(String phrase) throws Exception {
+        try (Connection conn = DriverManager.getConnection(url);
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT COUNT(*) FROM search_posts WHERE search_posts MATCH ?")) {
+            stmt.setString(1, phrase);
+            try (ResultSet rs = stmt.executeQuery()) {
+                assertThat(rs.next()).isTrue();
+                return rs.getLong(1);
+            }
+        }
+    }
+
+    private List<Long> searchRowIds(String phrase) throws Exception {
+        List<Long> rowIds = new ArrayList<>();
+        try (Connection conn = DriverManager.getConnection(url);
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT rowid FROM search_posts WHERE search_posts MATCH ? ORDER BY rowid")) {
+            stmt.setString(1, phrase);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    rowIds.add(rs.getLong(1));
+                }
+            }
+        }
+        return rowIds;
+    }
+
+    private void assertV8SearchSchema() throws Exception {
+        assertThat(schemaObjectExists("table", "search_posts")).isTrue();
+        String ddl = schemaObjectSql("table", "search_posts");
+        assertThat(ddl.toUpperCase()).contains("USING FTS5");
+        assertThat(ddl).contains("content='posts'");
+        assertThat(ddl).contains("content_rowid='id'");
+        assertThat(ddl).contains("unicode61 remove_diacritics 2");
+        assertThat(postSearchTriggerNames())
+                .containsExactlyInAnyOrder("posts_search_ai", "posts_search_ad", "posts_search_au");
+        assertThat(schemaObjectSql("trigger", "posts_search_ai")).contains("AFTER INSERT ON posts");
+        assertThat(schemaObjectSql("trigger", "posts_search_au"))
+                .contains("AFTER UPDATE OF content ON posts");
+        assertThat(schemaObjectSql("trigger", "posts_search_ad")).contains("AFTER DELETE ON posts");
+        assertThat(indexExists("idx_posts_timeline")).isTrue();
+        assertThat(hasIndex("posts", "created_at", "id")).isTrue();
+        assertThat(integrityCheck()).isEqualTo("ok");
+        assertSearchFtsIntegrity();
+    }
+
     @Test
-    void emptyDatabaseBootstrapsV1ThroughV7() throws Exception {
+    void emptyDatabaseBootstrapsV1ThroughV8() throws Exception {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(7);
+        assertThat(history).hasSize(8);
         assertThat(history.get(0)).containsExactly("1", "SQL", "V1__create_legacy_posts.sql", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
@@ -239,6 +349,10 @@ class SchemaMigrationConfigTest {
                 .containsExactly("6", "SQL", "V6__add_post_reposts.sql", "1");
         assertThat(history.get(6))
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
+        assertThat(history.get(7))
+                .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+
+        assertV8SearchSchema();
 
         assertThat(tableExists("posts")).isTrue();
         assertThat(tableExists("replies")).isTrue();
@@ -378,7 +492,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(7);
+        assertThat(history).hasSize(8);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
@@ -390,6 +504,10 @@ class SchemaMigrationConfigTest {
                 .containsExactly("6", "SQL", "V6__add_post_reposts.sql", "1");
         assertThat(history.get(6))
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
+        assertThat(history.get(7))
+                .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+
+        assertV8SearchSchema();
 
         try (Connection conn = DriverManager.getConnection(url);
                 Statement stmt = conn.createStatement();
@@ -439,7 +557,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(7);
+        assertThat(history).hasSize(8);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
@@ -451,6 +569,11 @@ class SchemaMigrationConfigTest {
                 .containsExactly("6", "SQL", "V6__add_post_reposts.sql", "1");
         assertThat(history.get(6))
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
+        assertThat(history.get(7))
+                .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+
+        assertV8SearchSchema();
+        assertThat(searchMatchCount("\"current\"")).isEqualTo(1);
 
         try (Connection conn = DriverManager.getConnection(url);
                 Statement stmt = conn.createStatement();
@@ -502,7 +625,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v3DatabaseUpgradesToV7PreservingUnownedContentAndIds() throws Exception {
+    void v3DatabaseUpgradesToV8PreservingUnownedContentAndIds() throws Exception {
         runMigration("3");
         execute(
                 "INSERT INTO posts (id, author, content, channel, created_at) VALUES (41, 'Alice', 'v3 post', 'ops', '2024-03-01 05:07:08')",
@@ -511,7 +634,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(7);
+        assertThat(history).hasSize(8);
         assertThat(history.get(2))
                 .containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
         assertThat(history.get(3))
@@ -522,6 +645,13 @@ class SchemaMigrationConfigTest {
                 .containsExactly("6", "SQL", "V6__add_post_reposts.sql", "1");
         assertThat(history.get(6))
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
+        assertThat(history.get(7))
+                .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+
+        assertV8SearchSchema();
+        assertThat(searchMatchCount("\"v3\"")).isEqualTo(1);
+        assertThat(searchMatchCount("\"reply\"")).isZero();
+
         assertThat(queryLong(
                         "SELECT COUNT(*) FROM posts WHERE id = 41 AND author_account_id IS NULL"))
                 .isEqualTo(1);
@@ -541,7 +671,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v4DatabaseUpgradesToV7PreservingAccountsAndOwnedContent() throws Exception {
+    void v4DatabaseUpgradesToV8PreservingAccountsAndOwnedContent() throws Exception {
         runMigration("4");
         execute(
                 "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-03-04 05:06:07', '2024-03-04 05:06:07')",
@@ -551,13 +681,15 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(7);
+        assertThat(history).hasSize(8);
         assertThat(history.get(4))
                 .containsExactly("5", "SQL", "V5__add_post_likes.sql", "1");
         assertThat(history.get(5))
                 .containsExactly("6", "SQL", "V6__add_post_reposts.sql", "1");
         assertThat(history.get(6))
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
+        assertThat(history.get(7))
+                .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id = 7 AND handle = 'alice'")).isEqualTo(1);
         assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 41 AND author_account_id = 7")).isEqualTo(1);
         assertThat(queryLong("SELECT COUNT(*) FROM replies WHERE id = 17 AND author_account_id = 7")).isEqualTo(1);
@@ -565,6 +697,9 @@ class SchemaMigrationConfigTest {
         assertThat(queryLong("SELECT COUNT(*) FROM post_reposts")).isZero();
         assertThat(queryLong("SELECT COUNT(*) FROM notifications")).isZero();
         assertThat(queryLong("SELECT COUNT(*) FROM notification_read_state")).isZero();
+
+        assertV8SearchSchema();
+        assertThat(searchMatchCount("\"owned\"")).isEqualTo(1);
     }
 
     @Test
@@ -578,7 +713,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v5DatabaseUpgradesToV7PreservingAccountsPostsRepliesLikesAndIds() throws Exception {
+    void v5DatabaseUpgradesToV8PreservingAccountsPostsRepliesLikesAndIds() throws Exception {
         runMigration("5");
         execute(
                 "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-04-05 06:07:08', '2024-04-05 06:07:08')",
@@ -589,11 +724,13 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(7);
+        assertThat(history).hasSize(8);
         assertThat(history.get(5))
                 .containsExactly("6", "SQL", "V6__add_post_reposts.sql", "1");
         assertThat(history.get(6))
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
+        assertThat(history.get(7))
+                .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
 
         assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id = 7 AND handle = 'alice'"))
                 .isEqualTo(1);
@@ -608,6 +745,9 @@ class SchemaMigrationConfigTest {
         assertThat(queryLong("SELECT COUNT(*) FROM notifications")).isZero();
         assertThat(queryLong("SELECT COUNT(*) FROM notification_read_state")).isZero();
 
+        assertV8SearchSchema();
+        assertThat(searchMatchCount("\"owned\"")).isEqualTo(1);
+
         execute(
                 "INSERT INTO posts (author, content, channel) VALUES ('next', 'after migration', 'tech')",
                 "INSERT INTO replies (post_id, author, content) VALUES (41, 'next', 'after migration')",
@@ -618,7 +758,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v6DatabaseUpgradesToV7PreservingAccountsPostsRepliesLikesRepostsAndNoBackfill()
+    void v6DatabaseUpgradesToV8PreservingAccountsPostsRepliesLikesRepostsAndBackfill()
             throws Exception {
         runMigration("6");
         execute(
@@ -632,8 +772,12 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(7);
+        assertThat(history).hasSize(8);
         assertThat(history.get(6)).containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
+        assertThat(history.get(7))
+                .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+
+        assertV8SearchSchema();
 
         assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id IN (7, 8)")).isEqualTo(2);
         assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 41 AND author_account_id = 7"))
@@ -648,6 +792,141 @@ class SchemaMigrationConfigTest {
 
         assertThat(queryLong("SELECT COUNT(*) FROM notifications")).isZero();
         assertThat(queryLong("SELECT COUNT(*) FROM notification_read_state")).isZero();
+    }
+
+    @Test
+    void searchTriggersSynchronizePostsContentExactTermsAndLifecycle() throws Exception {
+        runMigration();
+        assertV8SearchSchema();
+
+        execute(
+                "INSERT INTO accounts (id, handle, display_name, password_hash) VALUES (1, 'alice', 'Alice', 'hash')",
+                "INSERT INTO posts (id, author, content, channel, author_account_id) VALUES (10, 'Alice', 'alpha bolt', 'home', 1)");
+        assertThat(searchMatchCount("\"alpha\"")).isEqualTo(1);
+        assertThat(searchMatchCount("\"bolt\"")).isEqualTo(1);
+        assertThat(searchRowIds("\"alpha\"")).containsExactly(10L);
+
+        execute(
+                "INSERT INTO posts (id, author, content, channel, author_account_id) VALUES (11, 'Bob', 'wallet', 'tech', null)");
+        assertThat(searchMatchCount("\"wallet\"")).isEqualTo(1);
+        assertThat(searchMatchCount("\"wal\"")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM search_posts")).isEqualTo(2);
+
+        execute("UPDATE posts SET content = 'alpha volt' WHERE id = 10");
+        assertThat(searchMatchCount("\"bolt\"")).isZero();
+        assertThat(searchMatchCount("\"volt\"")).isEqualTo(1);
+        assertThat(searchRowIds("\"volt\"")).containsExactly(10L);
+        assertThat(searchMatchCount("\"alpha\"")).isEqualTo(1);
+
+        execute("DELETE FROM posts WHERE id = 11");
+        assertThat(searchMatchCount("\"wallet\"")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM posts")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM search_posts")).isEqualTo(1);
+        assertThat(integrityCheck()).isEqualTo("ok");
+        assertSearchFtsIntegrity();
+    }
+
+    @Test
+    void populatedV7UpgradePreservesDataAndBackfillsEveryExistingPost() throws Exception {
+        runMigration("7");
+        execute(
+                "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-07-08 09:10:11', '2024-07-08 09:10:11')",
+                "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (8, 'bob', 'Bob', 'hash', 'bio', '2024-07-08 09:10:11', '2024-07-08 09:10:11')",
+                "INSERT INTO posts (id, author, content, channel, created_at, author_account_id) VALUES (41, 'Alice', 'alpha bolt', 'tech', '2024-07-08 09:11:12', 7)",
+                "INSERT INTO posts (id, author, content, channel, created_at, author_account_id) VALUES (42, 'Bob', 'yellow volt', 'home', '2024-07-08 09:12:13', 8)",
+                "INSERT INTO posts (id, author, content, channel, created_at, author_account_id) VALUES (43, 'Alice', 'red wallet', 'ops', '2024-07-08 09:13:14', 7)",
+                "INSERT INTO replies (id, post_id, author, content, created_at, author_account_id) VALUES (17, 41, 'Bob', 'a reply slice', '2024-07-08 09:14:15', 8)",
+                "INSERT INTO post_likes (post_id, account_id, created_at) VALUES (41, 8, '2024-07-08 09:15:16')",
+                "INSERT INTO post_reposts (post_id, account_id, created_at) VALUES (41, 8, '2024-07-08 09:16:17')",
+                "INSERT INTO notifications (recipient_account_id, actor_account_id, post_id, type) VALUES (7, 8, 41, 'LIKE')");
+
+        runMigration();
+
+        List<String[]> history = queryHistory();
+        assertThat(history).hasSize(8);
+        assertThat(history.get(7))
+                .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+
+        assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id IN (7, 8)")).isEqualTo(2);
+        assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id IN (41, 42, 43)")).isEqualTo(3);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM posts WHERE id = 41 AND author_account_id = 7 AND content = 'alpha bolt'"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM replies WHERE id = 17 AND post_id = 41 AND content = 'a reply slice'"))
+                .isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM post_likes WHERE post_id = 41 AND account_id = 8"))
+                .isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM post_reposts WHERE post_id = 41 AND account_id = 8"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM notifications WHERE recipient_account_id = 7 AND post_id = 41 AND type = 'LIKE'"))
+                .isEqualTo(1);
+
+        assertV8SearchSchema();
+        assertThat(searchRowIds("\"bolt\"")).containsExactly(41L);
+        assertThat(searchRowIds("\"volt\"")).containsExactly(42L);
+        assertThat(searchRowIds("\"wallet\"")).containsExactly(43L);
+        assertThat(searchMatchCount("\"yellow\"")).isEqualTo(1);
+        assertThat(searchMatchCount("\"reply\"")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM search_posts")).isEqualTo(3);
+        assertThat(integrityCheck()).isEqualTo("ok");
+        assertSearchFtsIntegrity();
+    }
+
+    @Test
+    void failedV8MigrationDoesNotLeavePartialSearchSchemaOrHistory() throws Exception {
+        runMigration("7");
+        execute("""
+                CREATE TRIGGER posts_search_ai AFTER INSERT ON posts BEGIN
+                    SELECT 1;
+                END""");
+
+        assertThatThrownBy(this::runMigration).isInstanceOf(FlywayException.class);
+
+        assertThat(schemaObjectExists("table", "search_posts")).isFalse();
+        assertThat(postSearchTriggerNames()).containsExactly("posts_search_ai");
+        assertThat(queryHistory()).hasSize(7);
+        assertThat(queryHistory().get(6))
+                .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
+        assertThat(integrityCheck()).isEqualTo("ok");
+    }
+
+    @Test
+    void searchTriggerFailureRollsBackPostWriteAtomically() throws Exception {
+        runMigration();
+        execute(
+                "INSERT INTO accounts (id, handle, display_name, password_hash) VALUES (1, 'alice', 'Alice', 'hash')",
+                "INSERT INTO posts (id, author, content, channel, author_account_id) VALUES (10, 'Alice', 'alpha bolt', 'home', 1)");
+        assertThat(searchMatchCount("\"bolt\"")).isEqualTo(1);
+
+        execute("DROP TABLE search_posts");
+        assertThat(schemaObjectExists("table", "search_posts")).isFalse();
+        assertThat(postSearchTriggerNames())
+                .containsExactlyInAnyOrder("posts_search_ai", "posts_search_ad", "posts_search_au");
+
+        try (Connection conn = DriverManager.getConnection(url)) {
+            conn.setAutoCommit(false);
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute(
+                        "INSERT INTO accounts (id, handle, display_name, password_hash) VALUES (2, 'bob', 'Bob', 'hash')");
+                assertThatThrownBy(() -> stmt.execute(
+                                "INSERT INTO posts (id, author, content, channel, author_account_id) VALUES (11, 'Bob', 'new post', 'home', 2)"))
+                        .isInstanceOf(SQLException.class)
+                        .satisfies(t -> assertThat(t.getMessage()).isNotNull());
+            } finally {
+                try {
+                    conn.rollback();
+                } catch (SQLException ignored) {
+                    // The failing trigger may already have aborted the transaction.
+                }
+            }
+        }
+
+        assertThat(queryLong("SELECT COUNT(*) FROM accounts")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM posts")).isEqualTo(1);
+        assertThat(queryLong("SELECT MAX(id) FROM posts")).isEqualTo(10);
+        assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 11")).isZero();
     }
 
 }
