@@ -1,6 +1,7 @@
 package com.example.deck.repository;
 
 import com.example.deck.model.Post;
+import com.example.deck.model.PostImage;
 import com.example.deck.model.SearchCursor;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -45,10 +46,16 @@ public class SearchRepository {
                    'post:' || p.id AS timeline_entry_id,
                    NULL AS reposted_by,
                    NULL AS reposted_by_handle,
-                   NULL AS reposted_at
+                   NULL AS reposted_at,
+                   im.id AS image_id,
+                   im.content_type AS image_content_type,
+                   im.width AS image_width,
+                   im.height AS image_height,
+                   im.byte_size AS image_byte_size
             FROM search_posts sp
             JOIN posts p ON p.id = sp.rowid
             LEFT JOIN accounts a ON a.id = p.author_account_id
+            LEFT JOIN post_images im ON im.post_id = p.id
             WHERE search_posts MATCH :query""";
 
     private final JdbcClient jdbcClient;
@@ -112,7 +119,21 @@ public class SearchRepository {
                 rs.getBoolean("reposted_by_viewer"),
                 rs.getString("reposted_by"),
                 rs.getString("reposted_by_handle"),
-                repostedAt == null ? null : parseInstant(repostedAt));
+                repostedAt == null ? null : parseInstant(repostedAt),
+                mapPostImage(rs));
+    }
+
+    private PostImage mapPostImage(ResultSet rs) throws SQLException {
+        long imageId = rs.getLong("image_id");
+        if (rs.wasNull()) {
+            return null;
+        }
+        return PostImage.of(
+                imageId,
+                rs.getString("image_content_type"),
+                rs.getInt("image_width"),
+                rs.getInt("image_height"),
+                rs.getLong("image_byte_size"));
     }
 
     private Instant parseInstant(String value) {

@@ -1,9 +1,20 @@
-import { useState, type FormEvent } from "react"
-import { LayoutGrid, Send } from "lucide-react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react"
+import { LayoutGrid, Send, X } from "lucide-react"
 
-import { createPost, getApiErrorMessage } from "@/api/posts"
+import {
+  createPost,
+  createPostWithImage,
+  getApiErrorMessage,
+} from "@/api/posts"
 import type { AccountProfile } from "@/api/accounts"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -14,6 +25,9 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import type { Channel } from "@/types/post"
+
+const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png"])
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 interface ComposerProps {
   account: AccountProfile | null
@@ -30,9 +44,62 @@ export function Composer({
   const [channel, setChannel] = useState<Channel>("home")
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageError, setImageError] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const submittingRef = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl !== null) {
+        URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [previewUrl])
+
+  function clearFileInput() {
+    if (fileInputRef.current !== null) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  function resetImage() {
+    setImageFile(null)
+    setImageError(null)
+    setPreviewUrl(null)
+    clearFileInput()
+  }
+
+  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null
+    if (file === null) {
+      resetImage()
+      return
+    }
+
+    if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
+      resetImage()
+      setImageError("Images must be JPEG or PNG.")
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      resetImage()
+      setImageError("Images must be 5 MiB or smaller.")
+      return
+    }
+
+    setImageError(null)
+    setImageFile(file)
+    setPreviewUrl(URL.createObjectURL(file))
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (submittingRef.current) {
+      return
+    }
+
     setError(null)
 
     const trimmedContent = content.trim()
@@ -51,17 +118,24 @@ export function Composer({
       return
     }
 
+    submittingRef.current = true
     setSubmitting(true)
     try {
-      await createPost({
-        content: trimmedContent,
-        channel,
-      })
+      const request = { content: trimmedContent, channel }
+      if (imageFile === null) {
+        await createPost(request)
+      } else {
+        await createPostWithImage(request, imageFile)
+      }
       setContent("")
+      resetImage()
       await onPostCreated()
     } catch (error) {
-      setError(getApiErrorMessage(error, "Unable to publish post. Please try again."))
+      setError(
+        getApiErrorMessage(error, "Unable to publish post. Please try again.")
+      )
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
@@ -102,6 +176,7 @@ export function Composer({
               <Label htmlFor="channel">Channel</Label>
               <Select
                 value={channel}
+                disabled={submitting}
                 onValueChange={(value) => setChannel(value as Channel)}
               >
                 <SelectTrigger id="channel">
@@ -134,11 +209,66 @@ export function Composer({
                 onChange={(event) => setContent(event.target.value)}
                 maxLength={500}
                 rows={3}
+                disabled={submitting}
               />
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{error ?? "Posts refresh all columns after publishing."}</span>
                 <span>{content.length}/500</span>
               </div>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="image">Image</Label>
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  id="image"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  disabled={submitting}
+                  onChange={handleImageChange}
+                />
+                {previewUrl !== null ? (
+                  <>
+                    <img
+                      src={previewUrl}
+                      alt="Selected image preview"
+                      className="size-20 rounded-lg border border-border/60 object-cover"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={submitting}
+                      onClick={resetImage}
+                    >
+                      Remove
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Optional JPEG or PNG, up to 5 MiB.
+              </p>
+              {imageError ? (
+                <div
+                  role="alert"
+                  className="flex items-center justify-between gap-2"
+                >
+                  <p className="text-xs text-destructive">{imageError}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={submitting}
+                    aria-label="Dismiss image error"
+                    onClick={resetImage}
+                  >
+                    <X className="size-3.5" />
+                    Dismiss
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </form>
         )}

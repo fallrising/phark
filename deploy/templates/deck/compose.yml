@@ -10,6 +10,7 @@ services:
     environment:
       SERVER_PORT: "8080"
       APP_DB_PATH: "/data/deck.db"
+      APP_MEDIA_PATH: "/data/media"
       SPRING_PROFILES_ACTIVE: "prod"
       JAVA_TOOL_OPTIONS: >-
         -XX:MaxRAMPercentage=75

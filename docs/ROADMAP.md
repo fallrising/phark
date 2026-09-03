@@ -50,10 +50,10 @@
   - [x] SQLite FTS5 index
   - [x] cursor-paginated results
   - [x] query limits
-- [ ] **SDD-010 — Media attachments**
-  - [ ] object storage abstraction
-  - [ ] upload validation
-  - [ ] image rendering
+- [x] **SDD-010 — Media attachments**
+  - [x] object storage abstraction
+  - [x] upload validation
+  - [x] image rendering
 - [ ] **SDD-011 — Moderation and abuse controls**
   - [ ] rate limiting
   - [ ] content reporting

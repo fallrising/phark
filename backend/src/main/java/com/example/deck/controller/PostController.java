@@ -10,14 +10,17 @@ import com.example.deck.service.PostService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -41,7 +44,7 @@ public class PostController {
         return postService.getPosts(channel, limit, before, viewerAccountId);
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public Post createPost(
             @AuthenticationPrincipal AccountPrincipal principal,
@@ -50,5 +53,17 @@ public class PostController {
             throw new ApiException(ApiErrorCode.AUTHENTICATION_REQUIRED);
         }
         return postService.createPost(principal.getAccountId(), request);
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public Post createPostWithImage(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @Valid @RequestPart("post") CreatePostRequest request,
+            @RequestPart("image") MultipartFile image) {
+        if (principal == null) {
+            throw new ApiException(ApiErrorCode.AUTHENTICATION_REQUIRED);
+        }
+        return postService.createPostWithImage(principal.getAccountId(), request, image);
     }
 }

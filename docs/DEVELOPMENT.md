@@ -13,18 +13,18 @@ phark/
 │       │   ├── java/com/example/deck/
 │       │   │   ├── DeckApplication.java
 │       │   │   ├── config/       # Database, migration, security 與 SPA config
-│       │   │   ├── controller/   # Auth、account、profile、post、reply、like、repost、notifications、search APIs
+│       │   │   ├── controller/   # Auth、account、profile、post、reply、like、repost、notifications、search、media APIs
 │       │   │   ├── dto/          # JSON request/response boundaries
 │       │   │   ├── error/        # RFC 9457 codes、exception mapper、violations
 │       │   │   ├── model/        # Account、profile、content、RepostState、NotificationPage/ReadState、SearchCursor 契約
-│       │   │   ├── repository/   # Account/Post/Reply/PostLike/PostRepost/Notification/Search JdbcClient repositories
+│       │   │   ├── repository/   # Account/Post/Reply/PostLike/PostRepost/Notification/Search/PostImage JdbcClient repositories
 │       │   │   ├── security/     # Principal、UserDetails 與 Problem writers
-│       │   │   ├── service/      # Account、Post、Reply、PostLike、PostRepost、Notification、Search services
+│       │   │   ├── service/      # Account、Post、Reply、PostLike、PostRepost、Notification、Search、Media services（含 ImageValidator、MediaStorage/LocalMediaStorage）
 │       │   │   └── web/          # Request correlation filter
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       ├── application-prod.properties
-│       │       └── db/migration/  # Immutable Flyway V1...V8
+│       │       └── db/migration/  # Immutable Flyway V1...V9
 │       └── test/
 ├── frontend/                # React + TypeScript + Vite + shadcn/ui
 │   ├── package.json
@@ -33,12 +33,12 @@ phark/
 │   └── src/
 │       ├── api/client.ts    # Problem Details、same-origin fetch、CSRF memory
 │       ├── api/accounts.ts  # Account/session/profile typed calls
-│       ├── api/posts.ts     # Post/reply/like/repost typed calls
+│       ├── api/posts.ts     # Post/reply/like/repost typed calls（含 multipart createPostWithImage）
 │       ├── api/notifications.ts # Notification page/read typed calls
 │       ├── api/search.ts    # Search page typed calls
 │       ├── components/      # Auth、profile、timeline、composer、notifications、search、ui/*
 │       ├── lib/postReposts.ts  # repost snapshot/optimistic/rollback pure helpers
-│       └── types/post.ts
+│       └── types/post.ts    # Post/PostImage/PostPage type contracts
 ├── Dockerfile               # multi-stage build
 ├── .dockerignore
 ├── deploy/templates/        # VPS / CI 設定模板
@@ -63,6 +63,7 @@ phark/
 | Reposts | 每帳號冪等 repost/unrepost、original attribution 與 mixed timeline fan-out |
 | Notifications | reply/like/repost 事件、unread badge、通知分頁與「全部標為已讀」 |
 | Search | public FTS5 original post 搜尋、`s1:` cursor 分頁、load-more dedupe |
+| Media | 每篇 original post 至多附一張 JPEG/PNG；composer 預覽/removal/cleanup、PostCard lazy image |
 | 自動刷新 | 發文後三欄自動重新載入 |
 
 ## REST API
@@ -101,7 +102,8 @@ GET /api/posts?channel=home&limit=20&before=<opaque-cursor>
       "repostedByViewer": false,
       "repostedBy": null,
       "repostedByHandle": null,
-      "repostedAt": null
+      "repostedAt": null,
+      "image": null
     }
   ],
   "nextCursor": null
@@ -122,8 +124,15 @@ profile-post GET 因 viewer-aware fields 而標記 `Cache-Control: private, no-s
 
 ### `POST /api/posts`
 
-需 authenticated session 與有效 CSRF；作者只取自 session account。建立成功回傳
-`201 Created`。
+需 authenticated session 與有效 CSRF；作者只取自 session account。同一路徑接受兩種
+request Content-Type，由兩支 `@PostMapping` handler 依 `consumes` 分派：
+
+- **`application/json`**（既有行為，不變）：以 JSON body 建立純文字文章，回傳的
+  `Post.image` 恆為 `null`。
+- **`multipart/form-data`**（SDD-010 新增）：required `post` JSON part + `image`
+  （JPEG/PNG bytes）part。建立成功回傳 `201 Created`，`Post.image` 為 non-null。
+
+JSON 建立：
 
 ```json
 {
@@ -136,6 +145,94 @@ profile-post GET 因 viewer-aware fields 而標記 `Cache-Control: private, no-s
 |------|------|
 | `content` | 不可空白，最多 500 字 |
 | `channel` | 僅允許 `home`、`tech`、`ops`；無效回傳 `400` |
+
+### Multipart create（SDD-010）
+
+`post` 與 `image` 兩個 part 都是 **required**：`post` 是 part Content-Type 為
+`application/json` 的既有 `CreatePostRequest` JSON；`image` 是原始 JPEG/PNG bytes。
+Part 內文的驗證（`content` 不可空白、最多 500 字；`channel` 僅 `home`/`tech`/`ops`）
+與 JSON 分支完全一致。
+
+```http
+POST /api/posts
+Content-Type: multipart/form-data; boundary=----PharkBoundary
+
+------PharkBoundary
+Content-Disposition: form-data; name="post"
+Content-Type: application/json
+
+{"content":"Today I shipped the boring fix.","channel":"tech"}
+------PharkBoundary
+Content-Disposition: form-data; name="image"; filename="photo.jpg"
+Content-Type: image/jpeg
+
+<binary bytes>
+------PharkBoundary--
+```
+
+Copyable（`<headerName>`/`<token>` 來自 `GET /api/auth/csrf`，與 cookie jar 同
+session；`photo.jpg` 是 local JPEG/PNG 檔案）：
+
+```bash
+BASE_URL=http://127.0.0.1:8080
+# 先取得 CSRF headerName/token（cookie jar 同 session）
+curl -fsS -c cookies.txt -o csrf.json "$BASE_URL/api/auth/csrf"
+
+curl -fsS -b cookies.txt -c cookies.txt \
+  -X POST "$BASE_URL/api/posts" \
+  -H '<headerName>: <token>' \
+  -F 'post={"content":"Today I shipped the boring fix.","channel":"tech"};type=application/json' \
+  -F 'image=@photo.jpg;type=image/jpeg'
+```
+
+`image` part 規則（server 一律以自己驗證/測量值為準，不接受 client 宣告作為 storage
+或 path 決策）：
+
+| 規則 | 違反時 |
+|------|--------|
+| declared Content-Type 是 `image/jpeg` 或 `image/png` | `400 INVALID_IMAGE` |
+| declared 與 signature/`ImageIO` detected type 一致；magic bytes 有效；完整 decode 成功 | `400 INVALID_IMAGE` |
+| input ≤ 5 MiB（resolver `max-file-size=5MB`、`max-request-size=6MB`；service 再做 5 MiB bounded read） | `413 IMAGE_TOO_LARGE` |
+| width/height 各 1–4096 且 `width*height ≤ 12,000,000` | `400 INVALID_IMAGE` |
+
+- Client multipart filename（`filename="photo.jpg"`）**永不儲存、永不回傳**。
+- Dimension 檢查先於完整 decode（先讀 width/height、驗過 pixel 界線才 allocate 全幅
+  BufferedImage），截斷/損壞 input 在完整 decode 階段被拒絕。
+
+成功（`201 Created`）——完整 `Post`，`image` 為 non-null：
+
+```json
+{
+  "id": 42,
+  "author": "Alice",
+  "authorHandle": "alice_ops",
+  "content": "Today I shipped the boring fix.",
+  "channel": "tech",
+  "createdAt": "2026-09-03T10:00:00Z",
+  "replyCount": 0,
+  "likeCount": 0,
+  "likedByViewer": false,
+  "timelineEntryId": "post:42",
+  "repostCount": 0,
+  "repostedByViewer": false,
+  "repostedBy": null,
+  "repostedByHandle": null,
+  "repostedAt": null,
+  "image": {
+    "id": 7,
+    "url": "/api/media/7",
+    "contentType": "image/jpeg",
+    "width": 1200,
+    "height": 800,
+    "byteSize": 209715
+  }
+}
+```
+
+- `image` 是 nullable object；`url` 只依 public metadata ID 產生（immutable media-ID
+  reference）。public JSON/error 不含 sha256、storage key 或 filesystem path。
+- Repost activity、search item、timeline 與 profile 的 `image` 一律取自 original post
+  row（同一個 `{id,url,...}`，不重複儲存）。
 
 ### 建立文章回應範例
 
@@ -155,9 +252,42 @@ profile-post GET 因 viewer-aware fields 而標記 `Cache-Control: private, no-s
   "repostedByViewer": false,
   "repostedBy": null,
   "repostedByHandle": null,
-  "repostedAt": null
+  "repostedAt": null,
+  "image": null
 }
 ```
+
+### `GET /api/media/{id}`
+
+Public（不需 session；維持在既有 `GET /**` permitAll matcher 之下）、metadata-first
+的不可變圖片 bytes 讀取。`{id}` 是 `post_images` metadata row 的正整數 server ID；
+request 不接受任何 client path 或 storage key。
+
+```http
+GET /api/media/7
+```
+
+成功（`200`）：
+
+```http
+HTTP/1.1 200 OK
+Content-Type: image/jpeg
+Content-Length: 209715
+Content-Disposition: inline; filename="image-7.jpg"
+Cache-Control: public, max-age=31536000, immutable
+```
+
+- `Content-Type` 取自 DB metadata 的 canonical type，不是 client declared value；
+  `Content-Length` 取自已驗證的實際 stored bytes。
+- `Content-Disposition` 的 `filename` 依 **public metadata ID + canonical type** 產生：
+  `image-<mediaId>.jpg`（JPEG）或 `image-<mediaId>.png`（PNG），永不使用 storage key
+  或 client filename。
+- `Cache-Control: public, max-age=31536000, immutable`：一個 media ID 永遠只對應一組
+  初次寫入的 stored bytes，URL 是不可變 media-ID reference，可被 browser/CDN 長期快取。
+- Serving 前先依 metadata 讀取並驗證實際 byte length 與 SHA-256 相符；metadata 存在
+  但 storage 遺失/byte length 或 SHA-256 不符/損壞 → `500 INTERNAL_ERROR`（log 完整，
+  public body 不含內部路徑、storage key 或 SHA 值）。media ID ≤ 0 或非整數 →
+  `400 INVALID_MEDIA_ID`；正整數但無 metadata row → `404 MEDIA_NOT_FOUND`。
 
 ### `GET /api/posts/{postId}/replies`
 
@@ -339,7 +469,8 @@ literal 資料。compiled string 一律以 bound `MATCH` parameter 傳入。結�
       "repostedByViewer": false,
       "repostedBy": null,
       "repostedByHandle": null,
-      "repostedAt": null
+      "repostedAt": null,
+      "image": null
     }
   ],
   "nextCursor": "<opaque search cursor>"
@@ -481,7 +612,11 @@ members 必須忽略。
 | `INVALID_LIMIT` | 400 | limit 不是整數或超出範圍（timeline/replies/notifications 為 1–100；search 為 1–50） |
 | `INVALID_CURSOR` | 400 | timeline、replies、notifications、search 的 cursor 不合法或 namespace 不符 |
 | `INVALID_POST_ID` | 400 | post ID 不是正整數 |
-| `MALFORMED_REQUEST` | 400 | request body 缺失、語法錯誤或無法讀取 |
+| `INVALID_MEDIA_ID` | 400 | media ID 不是正整數（含 type mismatch） |
+| `INVALID_IMAGE` | 400 | image part 的 declared Content-Type 不合、declared 與 detected type 不一致、magic bytes 無效、完整 decode 失敗或 dimension/pixel 越界 |
+| `IMAGE_TOO_LARGE` | 413 | image input > 5 MiB（含 multipart resolver rejection、service-level bounded read） |
+| `MEDIA_NOT_FOUND` | 404 | media ID 為正整數但 metadata row 不存在 |
+| `MALFORMED_REQUEST` | 400 | request body 缺失、語法錯誤、multipart required part（`post`/`image`）缺失或 `post` JSON malformed |
 | `INVALID_CREDENTIALS` | 401 | 登入失敗；不區分 handle 或 password 原因 |
 | `AUTHENTICATION_REQUIRED` | 401 | protected endpoint 缺少有效 session |
 | `CSRF_TOKEN_INVALID` | 403 | unsafe request 缺少或使用無效 token |
@@ -493,6 +628,15 @@ members 必須忽略。
 | `HANDLE_UNAVAILABLE` | 409 | canonical handle 已被註冊 |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | request Content-Type 不支援 |
 | `INTERNAL_ERROR` | 500 | 未預期錯誤；不回傳內部 exception details |
+
+`INTERNAL_ERROR` 也用於 metadata 存在但 storage bytes 遺失 / byte length 或 SHA-256
+不符 / 損壞的 media GET（log 完整，public body 不含內部路徑、storage key 或 SHA 值）。
+
+Multipart create 的 error 區分：part 實際缺失或 `post` JSON malformed → `400
+MALFORMED_REQUEST`；part 存在但 `content` 空白/超長或 `channel` 不合規 →
+`400 VALIDATION_FAILED`（與 JSON 分支相同，不混用）；image 內容不合規 →
+`400 INVALID_IMAGE` / `413 IMAGE_TOO_LARGE`。Public error 一律不含內部路徑、storage
+key、SHA 或 client filename。
 
 每個 response（成功或失敗）都有 `X-Request-ID`。Client 可提供符合
 `[A-Za-z0-9._-]{1,64}` 的值；缺失或不合法時 server 會產生 UUID。Error body 的
@@ -545,6 +689,7 @@ Request ID 只用於關聯 response 與 server log，不是 authentication 或�
 | 變數 | 預設 | 說明 |
 |------|------|------|
 | `APP_DB_PATH` | 本地為 `./data/deck.db`；prod 為 `/data/deck.db` | SQLite 檔案路徑 |
+| `APP_MEDIA_PATH` | 本地為 `./data/media`；prod 為 `/data/media` | 媒體 bytes 根目錄（`MediaStorage` local adapter root） |
 | `SPRING_PROFILES_ACTIVE` | — | 設為 `prod` 啟用 production 設定 |
 | `SERVER_PORT` | `8080` | HTTP 埠（prod profile） |
 | `SESSION_COOKIE_SECURE` | 本地 `false`；prod `true` | HTTPS production 必須為 `true` |
@@ -657,7 +802,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 
 | 範圍 | 命令 | 覆蓋 |
 |------|------|------|
-| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content/likes/reposts、mixed timeline/cursor、notifications、migration（含 V8 FTS rebuild/trigger）、search compiler/cursor/repository/controller/errors |
+| Backend | `mvn -f backend/pom.xml test` | account/auth/CSRF/ownership/profile、content/likes/reposts、mixed timeline/cursor、notifications、search compiler/cursor/repository/controller/errors、image validator/storage/media service/persistence、multipart create 與 `GET /api/media` contract/errors、migration（含 V8 FTS rebuild/trigger 與 V8→V9） |
 | Frontend lint | `npm run lint`（在 `frontend/`） | oxlint |
 | Frontend build | `npm run build`（在 `frontend/`） | TypeScript + Vite |
 | 整合 | `docker build -t stream-deck .` | 含 frontend lint/build + Maven test |
@@ -674,6 +819,7 @@ docker run --rm -p 8080:8080 -v stream-deck-data:/data stream-deck
 ## 給接手 LLM 的提示
 
 - 改 post API 時同步更新 controller contract tests 與 `frontend/src/api/posts.ts`
+- 改 multipart 或 `GET /api/media` 契約時同步更新 `PostController` 的 `consumes` handler、`ApiExceptionHandler` 的 error mapping、`ImageValidator`/`LocalMediaStorage`/`MediaService` 與 `frontend/src/api/posts.ts`/`Composer`/`PostCard`；public JSON/error 不含 sha256、storage key 或 client filename
 - 新增 channel 需改：`CreatePostRequest`、新增一個 forward-only migration 更新
   CHECK constraint、`PostService` seed、`frontend` 的 `Channel` type 與 UI；不可修改
   已發布的 migration

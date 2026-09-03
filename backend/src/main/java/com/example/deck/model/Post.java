@@ -17,4 +17,26 @@ public record Post(
         boolean repostedByViewer,
         String repostedBy,
         String repostedByHandle,
-        Instant repostedAt) {}
+        Instant repostedAt,
+        PostImage image) {
+
+    public Post(long id,
+                String author,
+                String authorHandle,
+                String content,
+                String channel,
+                Instant createdAt,
+                long replyCount,
+                long likeCount,
+                boolean likedByViewer,
+                String timelineEntryId,
+                long repostCount,
+                boolean repostedByViewer,
+                String repostedBy,
+                String repostedByHandle,
+                Instant repostedAt) {
+        this(id, author, authorHandle, content, channel, createdAt, replyCount, likeCount,
+                likedByViewer, timelineEntryId, repostCount, repostedByViewer, repostedBy,
+                repostedByHandle, repostedAt, null);
+    }
+}

@@ -45,7 +45,8 @@ curl -fsS http://localhost:8080/actuator/health
 | POST | `/api/auth/logout` | 清除 session（需登入與 CSRF） |
 | GET | `/api/posts` | 最新一頁文章（預設 20 筆） |
 | GET | `/api/posts?channel=home&limit=20&before=...` | 依 channel 與 cursor 分頁 |
-| POST | `/api/posts` | 以 session identity 建立文章（需登入與 CSRF） |
+| POST | `/api/posts`（`application/json`） | 以 session identity 建立純文字文章（需登入與 CSRF；`image` 為 `null`） |
+| POST | `/api/posts`（`multipart/form-data`） | 以 session identity 建立附一張 JPEG/PNG 的文章：required `post` JSON part + `image` part（需登入與 CSRF；`image` non-null） |
 | PUT | `/api/posts/{postId}/like` | 冪等按讚；回傳權威 count/state（需登入與 CSRF） |
 | DELETE | `/api/posts/{postId}/like` | 冪等取消按讚（需登入與 CSRF） |
 | PUT | `/api/posts/{postId}/repost` | 冪等轉發；回傳權威 RepostState（需登入與 CSRF） |
@@ -58,6 +59,7 @@ curl -fsS http://localhost:8080/actuator/health
 | GET | `/api/profiles/{handle}` | 公開 profile |
 | PATCH | `/api/profiles/me` | 修改自己的 display name/bio |
 | GET | `/api/profiles/{handle}/posts` | 該帳號的 cursor-paginated original/repost activities |
+| GET | `/api/media/{id}` | public：依 metadata ID 讀取不可變圖片 bytes（不需登入；immutable cache） |
 
 `GET /api/posts` 回傳 `{ "items": [...], "nextCursor": "..." }`。將非空的
 `nextCursor` 作為下一次 request 的 `before`；`limit` 允許 `1..100`。
@@ -85,6 +87,21 @@ session 變更時以新身份重跑。完整契約見
 `limit` 允許 `1..100`；`PUT /api/notifications/read` 以 monotonic high-water
 cursor 將通知標為已讀。Header 的 unread badge 只在 `unreadCount > 0` 顯示（上限
 `99+`），`/notifications` route 提供逐頁載入與「全部標為已讀」。
+
+媒體附件（SDD-010）：每篇 original post 可附**零或一張** JPEG/PNG 圖片，`content`
+仍然必填。`POST /api/posts` 保留既有 JSON 分支（`image` 為 `null`），並以第二支依
+`consumes` 分派的 handler 接受 `multipart/form-data`：required `post` JSON part +
+`image` part，走與既有相同的 Session + CSRF 界線。共享的 `Post` JSON 新增 nullable
+`image` object `{id,url,contentType,width,height,byteSize}`，`url` 是公開不可變的
+`GET /api/media/{id}` reference（`Cache-Control: public, max-age=31536000,
+immutable`）；`sha256`、storage key 或 client filename 不會出現在 public JSON。
+Repost activity、search、timeline 與 profile item 一律**復用 original post 的
+image**，不重複儲存。本輪非目標：replies 圖片、avatar、圖片 edit/delete、多張圖片、
+transcoding 與外部 S3/CDN。Frontend 以 responsive lazy `<img>`（author-based alt）
+呈現。完整契約與規則見
+[開發指南的 multipart create](docs/DEVELOPMENT.md#multipart-createsdd-010) 與
+[`GET /api/media/{id}`](docs/DEVELOPMENT.md#get-apimediaid)；spec 見
+[docs/specs/010-media-attachments/spec.md](docs/specs/010-media-attachments/spec.md)。
 
 每個 response 都包含 `X-Request-ID`。API 錯誤使用
 `application/problem+json`（RFC 9457），以穩定的 `code` 供程式判斷，並在 body
@@ -124,4 +141,5 @@ Browser client 啟動時先並行取得 CSRF token 與 session，所有 `POST`�
 - [x] Per-account 冪等 reposts、original attribution 與 mixed timeline fan-out
 - [x] Per-account 通知中心與 unread badge
 - [x] Original post 全文搜尋（FTS5、`s1:` cursor 與 `/search`）
+- [x] 媒體附件（SDD-010：multipart create、公開 media GET、lazy rendering；見 [docs/specs/010-media-attachments/spec.md](docs/specs/010-media-attachments/spec.md)）
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）

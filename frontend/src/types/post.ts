@@ -1,5 +1,14 @@
 export type Channel = "home" | "tech" | "ops"
 
+export interface PostImage {
+  readonly id: number
+  readonly url: string
+  readonly contentType: string
+  readonly width: number
+  readonly height: number
+  readonly byteSize: number
+}
+
 export interface Post {
   id: number
   timelineEntryId: string
@@ -16,6 +25,7 @@ export interface Post {
   repostedBy: string | null
   repostedByHandle: string | null
   repostedAt: string | null
+  image: PostImage | null
 }
 
 export interface LikeState {
