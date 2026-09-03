@@ -1,6 +1,6 @@
 # Phark 產品任務樹
 
-> 最後更新：2026-09-02
+> 最後更新：2026-09-03
 
 狀態：`[x]` 完成、`[~]` 進行中、`[ ]` 待辦。優先級由 P0 到 P2。
 
@@ -46,10 +46,10 @@
 
 ## P2：探索與營運
 
-- [ ] **SDD-009 — Search**
-  - [ ] SQLite FTS5 index
-  - [ ] cursor-paginated results
-  - [ ] query limits
+- [x] **SDD-009 — Search**
+  - [x] SQLite FTS5 index
+  - [x] cursor-paginated results
+  - [x] query limits
 - [ ] **SDD-010 — Media attachments**
   - [ ] object storage abstraction
   - [ ] upload validation

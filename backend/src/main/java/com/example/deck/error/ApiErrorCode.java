@@ -7,6 +7,9 @@ public enum ApiErrorCode {
 
     VALIDATION_FAILED("urn:phark:problem:validation-failed", HttpStatus.BAD_REQUEST,
             "Validation failed", "One or more request fields are invalid."),
+    INVALID_QUERY("urn:phark:problem:invalid-query", HttpStatus.BAD_REQUEST,
+            "Invalid query",
+            "Query must be 1 to 100 characters with at most 8 terms, each containing a letter or digit."),
     INVALID_CHANNEL("urn:phark:problem:invalid-channel", HttpStatus.BAD_REQUEST,
             "Invalid channel", "Channel must be one of: home, tech, ops."),
     INVALID_LIMIT("urn:phark:problem:invalid-limit", HttpStatus.BAD_REQUEST,
