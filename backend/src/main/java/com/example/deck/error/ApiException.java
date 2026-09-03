@@ -8,13 +8,25 @@ public class ApiException extends RuntimeException {
     private final String detail;
 
     public ApiException(ApiErrorCode code) {
-        this(code, null);
+        this(code, defaultDetail(code), null);
     }
 
     public ApiException(ApiErrorCode code, Throwable cause) {
-        super(Objects.requireNonNull(code, "code").getDefaultDetail(), cause);
-        this.code = code;
-        this.detail = code.getDefaultDetail();
+        this(code, defaultDetail(code), cause);
+    }
+
+    public ApiException(ApiErrorCode code, String detail) {
+        this(code, detail, null);
+    }
+
+    private ApiException(ApiErrorCode code, String detail, Throwable cause) {
+        super(Objects.requireNonNull(detail, "detail"), cause);
+        this.code = Objects.requireNonNull(code, "code");
+        this.detail = detail;
+    }
+
+    private static String defaultDetail(ApiErrorCode code) {
+        return Objects.requireNonNull(code, "code").getDefaultDetail();
     }
 
     public ApiErrorCode getCode() {
