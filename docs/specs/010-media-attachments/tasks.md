@@ -118,26 +118,26 @@
 
 ## E：Frontend media compose 與 rendering
 
-- [ ] **E.1 Typed contract 與 composer precheck**
-  - [ ] E.1.1 `types/post.ts` 新增 nullable `PostImage`（id/url/contentType/width/height/
+- [x] **E.1 Typed contract 與 composer precheck**
+  - [x] E.1.1 `types/post.ts` 新增 nullable `PostImage`（id/url/contentType/width/height/
     byteSize，不含 sha256/storage key）與 `Post.image`；`api/posts.ts` 新增 multipart create。
-  - [ ] E.1.2 Composer 新增 `<input type="file" accept="image/jpeg,image/png">` 與 size/type
+  - [x] E.1.2 Composer 新增 `<input type="file" accept="image/jpeg,image/png">` 與 size/type
     client precheck（5 MiB、`image/jpeg`/`image/png`）。
-  - [ ] E.1.3 新增可移除的 object-URL preview，移除/更換時 revoke（cleanup），提交期間
+  - [x] E.1.3 新增可移除的 object-URL preview，移除/更換時 revoke（cleanup），提交期間
     disabled/pending。
-- [ ] **E.2 Create 與 PostCard 渲染**
-  - [ ] E.2.1 以 multipart create（FormData `post` JSON Blob + `image` File、CSRF header），
+- [x] **E.2 Create 與 PostCard 渲染**
+  - [x] E.2.1 以 multipart create（FormData `post` JSON Blob + `image` File、CSRF header），
     success 後才 reset form/preview，failure 保留現況。
-  - [ ] E.2.2 PostCard 在所有 reuse surface（timeline/search/profile）以 responsive lazy
+  - [x] E.2.2 PostCard 在所有 reuse surface（timeline/search/profile）以 responsive lazy
     `<img>` 渲染 `Post.image`。
-  - [ ] E.2.3 產出 author-based alt text、無 client path、載入失敗/無圖 graceful 降級不破
+  - [x] E.2.3 產出 author-based alt text、無 client path、載入失敗/無圖 graceful 降級不破
     layout；server 維持 authoritative。
-- [ ] **E.3 Interaction/gate**
-  - [ ] E.3.1 Create 失敗顯示受控 error、不 reset、不產生 orphan blob；submit pending 期間
+- [x] **E.3 Interaction/gate**
+  - [x] E.3.1 Create 失敗顯示受控 error、不 reset、不產生 orphan blob；submit pending 期間
     不重送。
-  - [ ] E.3.2 既有 authenticated reply/like/repost/search 行為維持；repost/search 顯示
+  - [x] E.3.2 既有 authenticated reply/like/repost/search 行為維持；repost/search 顯示
     original image 而不重複儲存。
-  - [ ] E.3.3 執行 frontend oxlint 0 warnings、TypeScript 與 production build。
+  - [x] E.3.3 執行 frontend oxlint 0 warnings、TypeScript 與 production build。
 
 ## F：文件與整合交付
 

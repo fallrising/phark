@@ -167,8 +167,12 @@ export async function apiRequest<T>(
 
   let encodedBody: BodyInit | undefined
   if (body !== undefined) {
-    headers.set("Content-Type", "application/json")
-    encodedBody = JSON.stringify(body)
+    if (body instanceof FormData) {
+      encodedBody = body
+    } else {
+      headers.set("Content-Type", "application/json")
+      encodedBody = JSON.stringify(body)
+    }
   }
 
   const response = await fetch(sameOriginPath, {
