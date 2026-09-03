@@ -2,6 +2,7 @@ package com.example.deck.repository;
 
 import com.example.deck.model.Post;
 import com.example.deck.model.PostCursor;
+import com.example.deck.model.PostImage;
 import com.example.deck.model.TimelineEntryKind;
 import com.example.deck.model.TimelinePost;
 import java.sql.ResultSet;
@@ -37,9 +38,15 @@ public class PostRepository {
                    'post:' || p.id AS timeline_entry_id,
                    NULL AS reposted_by,
                    NULL AS reposted_by_handle,
-                   NULL AS reposted_at
+                   NULL AS reposted_at,
+                   im.id AS image_id,
+                   im.content_type AS image_content_type,
+                   im.width AS image_width,
+                   im.height AS image_height,
+                   im.byte_size AS image_byte_size
             FROM posts p
-            LEFT JOIN accounts a ON a.id = p.author_account_id""";
+            LEFT JOIN accounts a ON a.id = p.author_account_id
+            LEFT JOIN post_images im ON im.post_id = p.id""";
     private static final String VIEWER_LIKED = """
             EXISTS(
                 SELECT 1 FROM post_likes viewer_like
@@ -63,7 +70,12 @@ public class PostRepository {
                    %s AS reposted_by_viewer,
                    activity.timeline_entry_id, activity.reposted_by,
                    activity.reposted_by_handle, activity.reposted_at,
-                   activity.activity_at, activity.entry_kind, activity.entry_id
+                   activity.activity_at, activity.entry_kind, activity.entry_id,
+                   im.id AS image_id,
+                   im.content_type AS image_content_type,
+                   im.width AS image_width,
+                   im.height AS image_height,
+                   im.byte_size AS image_byte_size
             FROM (
                 SELECT original.id AS post_id,
                        'post:' || original.id AS timeline_entry_id,
@@ -89,7 +101,8 @@ public class PostRepository {
                 JOIN accounts reposter ON reposter.id = repost.account_id
             ) activity
             JOIN posts p ON p.id = activity.post_id
-            LEFT JOIN accounts author ON author.id = p.author_account_id""";
+            LEFT JOIN accounts author ON author.id = p.author_account_id
+            LEFT JOIN post_images im ON im.post_id = p.id""";
 
     private final JdbcClient jdbcClient;
 
@@ -308,7 +321,21 @@ public class PostRepository {
                 rs.getBoolean("reposted_by_viewer"),
                 rs.getString("reposted_by"),
                 rs.getString("reposted_by_handle"),
-                repostedAt == null ? null : parseInstant(repostedAt));
+                repostedAt == null ? null : parseInstant(repostedAt),
+                mapPostImage(rs));
+    }
+
+    private PostImage mapPostImage(ResultSet rs) throws SQLException {
+        long imageId = rs.getLong("image_id");
+        if (rs.wasNull()) {
+            return null;
+        }
+        return PostImage.of(
+                imageId,
+                rs.getString("image_content_type"),
+                rs.getInt("image_width"),
+                rs.getInt("image_height"),
+                rs.getLong("image_byte_size"));
     }
 
     private TimelinePost mapTimelinePost(ResultSet rs, int rowNum) throws SQLException {
