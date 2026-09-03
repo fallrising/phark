@@ -22,6 +22,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 class SchemaMigrationConfigTest {
 
+    static final String SHA256 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
     @TempDir
     File tempDir;
 
@@ -332,12 +335,31 @@ class SchemaMigrationConfigTest {
         assertSearchFtsIntegrity();
     }
 
+    private void assertV9PostImagesSchema() throws Exception {
+        assertThat(tableExists("post_images")).isTrue();
+        assertThat(columnIsNullable("post_images", "post_id")).isFalse();
+        assertThat(columnIsNullable("post_images", "storage_key")).isFalse();
+        assertThat(columnIsNullable("post_images", "content_type")).isFalse();
+        assertThat(columnIsNullable("post_images", "byte_size")).isFalse();
+        assertThat(columnIsNullable("post_images", "width")).isFalse();
+        assertThat(columnIsNullable("post_images", "height")).isFalse();
+        assertThat(columnIsNullable("post_images", "sha256")).isFalse();
+        assertThat(columnIsNullable("post_images", "created_at")).isFalse();
+        assertThat(primaryKeyOrder("post_images", "id")).isEqualTo(1);
+        assertThat(primaryKeyOrder("post_images", "post_id")).isZero();
+        assertThat(primaryKeyOrder("post_images", "storage_key")).isZero();
+        assertThat(hasUniqueIndex("post_images", "post_id")).isTrue();
+        assertThat(hasUniqueIndex("post_images", "storage_key")).isTrue();
+        assertThat(fkExists("post_images", "post_id", "posts", "CASCADE")).isTrue();
+        assertThat(integrityCheck()).isEqualTo("ok");
+    }
+
     @Test
-    void emptyDatabaseBootstrapsV1ThroughV8() throws Exception {
+    void emptyDatabaseBootstrapsV1ThroughV9() throws Exception {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(8);
+        assertThat(history).hasSize(9);
         assertThat(history.get(0)).containsExactly("1", "SQL", "V1__create_legacy_posts.sql", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
@@ -351,8 +373,11 @@ class SchemaMigrationConfigTest {
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(history.get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
 
         assertV8SearchSchema();
+        assertV9PostImagesSchema();
 
         assertThat(tableExists("posts")).isTrue();
         assertThat(tableExists("replies")).isTrue();
@@ -361,6 +386,7 @@ class SchemaMigrationConfigTest {
         assertThat(tableExists("post_reposts")).isTrue();
         assertThat(tableExists("notifications")).isTrue();
         assertThat(tableExists("notification_read_state")).isTrue();
+        assertThat(tableExists("post_images")).isTrue();
         assertThat(tableExists("flyway_schema_history")).isTrue();
 
         assertThat(columnExists("accounts", "id")).isTrue();
@@ -423,6 +449,7 @@ class SchemaMigrationConfigTest {
         assertThat(fkExists("notifications", "post_id", "posts", "CASCADE")).isTrue();
         assertThat(fkExists("notifications", "reply_id", "replies", "CASCADE")).isTrue();
         assertThat(fkExists("notification_read_state", "account_id", "accounts", "CASCADE")).isTrue();
+        assertThat(fkExists("post_images", "post_id", "posts", "CASCADE")).isTrue();
 
         assertThat(indexExists("idx_posts_author_timeline")).isTrue();
         assertThat(indexExists("idx_replies_author")).isTrue();
@@ -449,6 +476,7 @@ class SchemaMigrationConfigTest {
         assertThat(queryLong("SELECT COUNT(*) FROM post_reposts")).isZero();
         assertThat(queryLong("SELECT COUNT(*) FROM notifications")).isZero();
         assertThat(queryLong("SELECT COUNT(*) FROM notification_read_state")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM post_images")).isZero();
 
         execute(
                 "INSERT INTO accounts (id, handle, display_name, password_hash) VALUES (1, 'bob', 'Bob', 'hash')",
@@ -492,7 +520,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(8);
+        assertThat(history).hasSize(9);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
@@ -506,6 +534,8 @@ class SchemaMigrationConfigTest {
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(history.get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
 
         assertV8SearchSchema();
 
@@ -557,7 +587,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(8);
+        assertThat(history).hasSize(9);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
@@ -571,6 +601,8 @@ class SchemaMigrationConfigTest {
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(history.get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
 
         assertV8SearchSchema();
         assertThat(searchMatchCount("\"current\"")).isEqualTo(1);
@@ -625,7 +657,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v3DatabaseUpgradesToV8PreservingUnownedContentAndIds() throws Exception {
+    void v3DatabaseUpgradesToV9PreservingUnownedContentAndIds() throws Exception {
         runMigration("3");
         execute(
                 "INSERT INTO posts (id, author, content, channel, created_at) VALUES (41, 'Alice', 'v3 post', 'ops', '2024-03-01 05:07:08')",
@@ -634,7 +666,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(8);
+        assertThat(history).hasSize(9);
         assertThat(history.get(2))
                 .containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
         assertThat(history.get(3))
@@ -647,6 +679,8 @@ class SchemaMigrationConfigTest {
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(history.get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
 
         assertV8SearchSchema();
         assertThat(searchMatchCount("\"v3\"")).isEqualTo(1);
@@ -671,7 +705,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v4DatabaseUpgradesToV8PreservingAccountsAndOwnedContent() throws Exception {
+    void v4DatabaseUpgradesToV9PreservingAccountsAndOwnedContent() throws Exception {
         runMigration("4");
         execute(
                 "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-03-04 05:06:07', '2024-03-04 05:06:07')",
@@ -681,7 +715,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(8);
+        assertThat(history).hasSize(9);
         assertThat(history.get(4))
                 .containsExactly("5", "SQL", "V5__add_post_likes.sql", "1");
         assertThat(history.get(5))
@@ -690,6 +724,8 @@ class SchemaMigrationConfigTest {
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(history.get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
         assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id = 7 AND handle = 'alice'")).isEqualTo(1);
         assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 41 AND author_account_id = 7")).isEqualTo(1);
         assertThat(queryLong("SELECT COUNT(*) FROM replies WHERE id = 17 AND author_account_id = 7")).isEqualTo(1);
@@ -713,7 +749,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v5DatabaseUpgradesToV8PreservingAccountsPostsRepliesLikesAndIds() throws Exception {
+    void v5DatabaseUpgradesToV9PreservingAccountsPostsRepliesLikesAndIds() throws Exception {
         runMigration("5");
         execute(
                 "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-04-05 06:07:08', '2024-04-05 06:07:08')",
@@ -724,13 +760,15 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(8);
+        assertThat(history).hasSize(9);
         assertThat(history.get(5))
                 .containsExactly("6", "SQL", "V6__add_post_reposts.sql", "1");
         assertThat(history.get(6))
                 .containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(history.get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
 
         assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id = 7 AND handle = 'alice'"))
                 .isEqualTo(1);
@@ -758,7 +796,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v6DatabaseUpgradesToV8PreservingAccountsPostsRepliesLikesRepostsAndBackfill()
+    void v6DatabaseUpgradesToV9PreservingAccountsPostsRepliesLikesRepostsAndBackfill()
             throws Exception {
         runMigration("6");
         execute(
@@ -772,10 +810,12 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(8);
+        assertThat(history).hasSize(9);
         assertThat(history.get(6)).containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(history.get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
 
         assertV8SearchSchema();
 
@@ -843,9 +883,11 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(8);
+        assertThat(history).hasSize(9);
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(history.get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
 
         assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id IN (7, 8)")).isEqualTo(2);
         assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id IN (41, 42, 43)")).isEqualTo(3);
@@ -927,6 +969,178 @@ class SchemaMigrationConfigTest {
         assertThat(queryLong("SELECT COUNT(*) FROM posts")).isEqualTo(1);
         assertThat(queryLong("SELECT MAX(id) FROM posts")).isEqualTo(10);
         assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 11")).isZero();
+    }
+
+    @Test
+    void emptyV8DatabaseUpgradesToV9WithEmptyPostImages() throws Exception {
+        runMigration("8");
+
+        runMigration();
+
+        List<String[]> history = queryHistory();
+        assertThat(history).hasSize(9);
+        assertThat(history.get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertV8SearchSchema();
+        assertV9PostImagesSchema();
+        assertThat(queryLong("SELECT COUNT(*) FROM post_images")).isZero();
+        assertThat(integrityCheck()).isEqualTo("ok");
+    }
+
+    @Test
+    void populatedV8DatabaseUpgradesToV9PreservingCountsIdsAndTimestamps() throws Exception {
+        runMigration("8");
+        execute(
+                "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-08-09 10:11:12', '2024-08-09 10:11:12')",
+                "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (8, 'bob', 'Bob', 'hash', 'bio', '2024-08-09 10:11:12', '2024-08-09 10:11:12')",
+                "INSERT INTO posts (id, author, content, channel, created_at, author_account_id) VALUES (41, 'Alice', 'alpha bolt', 'tech', '2024-08-09 10:12:13', 7)",
+                "INSERT INTO posts (id, author, content, channel, created_at, author_account_id) VALUES (42, 'Bob', 'yellow volt', 'home', '2024-08-09 10:13:14', 8)",
+                "INSERT INTO replies (id, post_id, author, content, created_at, author_account_id) VALUES (17, 41, 'Bob', 'a reply', '2024-08-09 10:14:15', 8)",
+                "INSERT INTO post_likes (post_id, account_id, created_at) VALUES (41, 8, '2024-08-09 10:15:16')",
+                "INSERT INTO post_reposts (post_id, account_id, created_at) VALUES (41, 8, '2024-08-09 10:16:17')",
+                "INSERT INTO notifications (recipient_account_id, actor_account_id, post_id, type) VALUES (7, 8, 41, 'LIKE')");
+
+        runMigration();
+
+        List<String[]> history = queryHistory();
+        assertThat(history).hasSize(9);
+        assertThat(history.get(7)).containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(history.get(8)).containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+
+        assertThat(queryLong("SELECT COUNT(*) FROM accounts")).isEqualTo(2);
+        assertThat(queryLong("SELECT COUNT(*) FROM posts")).isEqualTo(2);
+        assertThat(queryLong("SELECT COUNT(*) FROM replies")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM post_likes")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM post_reposts")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM notifications")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM post_images")).isZero();
+
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM accounts WHERE id = 7 AND created_at = '2024-08-09 10:11:12' AND updated_at = '2024-08-09 10:11:12'"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM posts WHERE id = 41 AND content = 'alpha bolt' AND created_at = '2024-08-09 10:12:13' AND author_account_id = 7"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM replies WHERE id = 17 AND content = 'a reply' AND created_at = '2024-08-09 10:14:15'"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM post_likes WHERE post_id = 41 AND account_id = 8 AND created_at = '2024-08-09 10:15:16'"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM post_reposts WHERE post_id = 41 AND account_id = 8 AND created_at = '2024-08-09 10:16:17'"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM notifications WHERE recipient_account_id = 7 AND actor_account_id = 8 AND post_id = 41 AND type = 'LIKE'"))
+                .isEqualTo(1);
+
+        assertV8SearchSchema();
+        assertThat(searchRowIds("\"bolt\"")).containsExactly(41L);
+        assertThat(queryLong("SELECT COUNT(*) FROM search_posts")).isEqualTo(2);
+        assertThat(integrityCheck()).isEqualTo("ok");
+    }
+
+    @Test
+    void postImagesConstraintsEnforceOneToOneUniqueKeyStrictChecksAndCascade()
+            throws Exception {
+        runMigration();
+        execute(
+                "INSERT INTO posts (id, author, content, channel) VALUES (10, 'Alice', 'post', 'home')",
+                "INSERT INTO posts (id, author, content, channel) VALUES (11, 'Bob', 'post', 'tech')");
+
+        execute("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-a', 'image/jpeg', 100, 400, 300, '%s')"""
+                .formatted(SHA256));
+
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/gif', 100, 400, 300, '%s')"""
+                .formatted(SHA256));
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 5242881, 400, 300, '%s')"""
+                .formatted(SHA256));
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 0, 400, 300, '%s')"""
+                .formatted(SHA256));
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 100, 0, 300, '%s')"""
+                .formatted(SHA256));
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 100, 4097, 300, '%s')"""
+                .formatted(SHA256));
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 100, 400, 4097, '%s')"""
+                .formatted(SHA256));
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 100, 4000, 3001, '%s')"""
+                .formatted(SHA256));
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 100, 400, 300, '%s')"""
+                .formatted("ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef0123456789"));
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 100, 400, 300, 'abc')""");
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 100, 400, 300,
+                        'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg')""");
+
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (10, 'key-b', 'image/jpeg', 100, 400, 300, '%s')"""
+                .formatted(SHA256));
+        assertSqlRejected("""
+                INSERT INTO post_images
+                    (post_id, storage_key, content_type, byte_size, width, height, sha256)
+                VALUES (11, 'key-a', 'image/jpeg', 100, 400, 300, '%s')"""
+                .formatted(SHA256));
+        assertThat(queryLong("SELECT COUNT(*) FROM post_images")).isEqualTo(1);
+
+        assertThatThrownBy(() -> execute(
+                        "PRAGMA foreign_keys = ON",
+                        "INSERT INTO post_images (post_id, storage_key, content_type, byte_size, width, height, sha256) VALUES (999, 'key-c', 'image/jpeg', 100, 400, 300, '"
+                                + SHA256 + "')"))
+                .isInstanceOf(SQLException.class);
+
+        execute("PRAGMA foreign_keys = ON", "DELETE FROM posts WHERE id = 10");
+        assertThat(queryLong("SELECT COUNT(*) FROM post_images")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM posts")).isEqualTo(1);
+        assertThat(integrityCheck()).isEqualTo("ok");
+    }
+
+    @Test
+    void failedV9MigrationDoesNotLeavePartialPostImagesSchemaOrHistory() throws Exception {
+        runMigration("8");
+        execute("CREATE TABLE post_images (id INTEGER PRIMARY KEY)");
+
+        assertThatThrownBy(this::runMigration).isInstanceOf(FlywayException.class);
+
+        assertThat(queryHistory()).hasSize(8);
+        assertThat(queryHistory().get(7))
+                .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
+        assertThat(schemaObjectSql("table", "post_images"))
+                .isEqualTo("CREATE TABLE post_images (id INTEGER PRIMARY KEY)");
+        assertThat(integrityCheck()).isEqualTo("ok");
     }
 
 }

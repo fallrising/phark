@@ -21,6 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class SearchRepositoryTest {
 
+    private static final String SHA256 =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
     @Autowired
     private SearchRepository searchRepository;
 
@@ -41,6 +44,9 @@ class SearchRepositoryTest {
 
     @Autowired
     private ReplyRepository replyRepository;
+
+    @Autowired
+    private PostImageRepository postImageRepository;
 
     @Autowired
     private JdbcClient jdbcClient;
@@ -320,6 +326,44 @@ class SearchRepositoryTest {
 
         assertThat(second).isEqualTo(first);
         assertThat(first).isSortedAccordingTo(Comparator.reverseOrder());
+    }
+
+    @Test
+    void searchResultForOriginalWithImageProjectsSharedPublicImage() {
+        Account alice = accountRepository.insert("alice", "Alice", "hash");
+        Post post = insertOwnedAt(alice, "image phrase", "2026-09-03 09:00:00");
+        long imageId = postImageRepository.insert(
+                post.id(), "key-1", "image/png", 2048, 640, 480, SHA256);
+
+        List<Post> results = search(queryCompiler.compile("image"));
+
+        assertThat(results).hasSize(1);
+        Post actual = results.get(0);
+        assertThat(actual.image()).isNotNull();
+        assertThat(actual.image().id()).isEqualTo(imageId);
+        assertThat(actual.image().url()).isEqualTo("/api/media/" + imageId);
+        assertThat(actual.image().contentType()).isEqualTo("image/png");
+        assertThat(actual.image().byteSize()).isEqualTo(2048);
+        assertThat(actual.image().width()).isEqualTo(640);
+        assertThat(actual.image().height()).isEqualTo(480);
+        assertThat(actual.timelineEntryId()).isEqualTo("post:" + post.id());
+        assertThat(actual.likedByViewer()).isFalse();
+        assertThat(actual.repostedByViewer()).isFalse();
+        assertThat(actual.repostedBy()).isNull();
+        assertThat(actual.repostedByHandle()).isNull();
+        assertThat(actual.repostedAt()).isNull();
+    }
+
+    @Test
+    void searchResultForLegacyPostProjectsNullImage() {
+        insertAt("no image phrase", "2026-09-03 09:00:00");
+
+        List<Post> results = search(queryCompiler.compile("image"));
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).image()).isNull();
+        assertThat(results.get(0).author()).isEqualTo("legacy author");
+        assertThat(results.get(0).authorHandle()).isNull();
     }
 
     private List<Post> search(String compiledQuery) {

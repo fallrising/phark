@@ -43,25 +43,25 @@
 
 ## B：V9 migration 與 metadata repository
 
-- [ ] **B.1 RED — Migration contract**
-  - [ ] B.1.1 測試 empty database 建立 `post_images`（one-to-one UNIQUE post_id、UNIQUE
+- [x] **B.1 RED — Migration contract**
+  - [x] B.1.1 測試 empty database 建立 `post_images`（one-to-one UNIQUE post_id、UNIQUE
     storage_key、FK cascade）與 `PRAGMA integrity_check`。
-  - [ ] B.1.2 測試 populated V8 upgrade 保留 accounts/posts/replies/likes/reposts/
+  - [x] B.1.2 測試 populated V8 upgrade 保留 accounts/posts/replies/likes/reposts/
     notifications 的 count/IDs/timestamps 且 `post_images` 為空。
-  - [ ] B.1.3 測試 migration 原子性、`flyway_schema_history` 一致與 strict CHECK（含 64-hex
+  - [x] B.1.3 測試 migration 原子性、`flyway_schema_history` 一致與 strict CHECK（含 64-hex
     lowercase sha256）拒絕非法值。
-- [ ] **B.2 RED — Metadata repository contract**
-  - [ ] B.2.1 測試 `PostImageRepository` insert/findPositiveId/findByPostId round-trip 與
+- [x] **B.2 RED — Metadata repository contract**
+  - [x] B.2.1 測試 `PostImageRepository` insert/findPositiveId/findByPostId round-trip 與
     byteSize/寬高/contentType/sha256 一致。
-  - [ ] B.2.2 測試 post 直接刪除時 `post_images` metadata row 一併刪除（FK cascade 只刪
+  - [x] B.2.2 測試 post 直接刪除時 `post_images` metadata row 一併刪除（FK cascade 只刪
     metadata，無孤兒 metadata；filesystem bytes 不受 DB 影響）。
-  - [ ] B.2.3 測試 strict CHECK constraints（content_type、5 MiB、1–4096、12,000,000
+  - [x] B.2.3 測試 strict CHECK constraints（content_type、5 MiB、1–4096、12,000,000
     pixels、sha256 grammar）拒絕非法值。
-- [ ] **B.3 GREEN/REFACTOR — V9 schema + repository**
-  - [ ] B.3.1 新增 immutable `V9__add_post_images.sql`（one-to-one + cascade + strict checks
+- [x] **B.3 GREEN/REFACTOR — V9 schema + repository**
+  - [x] B.3.1 新增 immutable `V9__add_post_images.sql`（one-to-one + cascade + strict checks
     + sha256 column）。
-  - [ ] B.3.2 實作 `PostImageRepository`（JdbcClient insert/lookup，無刪檔方法）。
-  - [ ] B.3.3 執行 focused migration/metadata 與完整 backend regression。
+  - [x] B.3.2 實作 `PostImageRepository`（JdbcClient insert/lookup，無刪檔方法）。
+  - [x] B.3.3 執行 focused migration/metadata 與完整 backend regression。
 
 ## C：Image validation 與 MediaStorage adapter
 
