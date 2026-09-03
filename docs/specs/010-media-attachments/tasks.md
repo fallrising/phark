@@ -65,27 +65,27 @@
 
 ## C：Image validation 與 MediaStorage adapter
 
-- [ ] **C.1 RED — ImageValidator contract**
-  - [ ] C.1.1 測試 declared vs detected type 一致：JPEG `FF D8 FF`、PNG
+- [x] **C.1 RED — ImageValidator contract**
+  - [x] C.1.1 測試 declared vs detected type 一致：JPEG `FF D8 FF`、PNG
     `89 50 4E 47 0D 0A 1A 0A`、`ImageIO` format 交叉比對、mismatch → `INVALID_IMAGE`。
-  - [ ] C.1.2 測試 5 MiB bounded read、width/height 1–4096、pixels ≤ 12,000,000、pixel
+  - [x] C.1.2 測試 5 MiB bounded read、width/height 1–4096、pixels ≤ 12,000,000、pixel
     bounds 在全幅 allocate 之前檢查、truncated/corrupt `ImageIO` decode reject。
-  - [ ] C.1.3 測試 invalid image → `INVALID_IMAGE`、too large → `IMAGE_TOO_LARGE`、
+  - [x] C.1.3 測試 invalid image → `INVALID_IMAGE`、too large → `IMAGE_TOO_LARGE`、
     sha256（lowercase 64-hex）/byteSize/寬高由 server 測量、validator 不寫檔、不碰 DB、
     不洩漏內部路徑。
-- [ ] **C.2 RED — MediaStorage/local adapter contract**
-  - [ ] C.2.1 測試 server-generated UUID storage_key、key grammar、路徑鎖在
+- [x] **C.2 RED — MediaStorage/local adapter contract**
+  - [x] C.2.1 測試 server-generated UUID storage_key、key grammar、路徑鎖在
     `${APP_MEDIA_PATH}` 之下、永不使用 client filename。
-  - [ ] C.2.2 測試 byte-oriented `store/read/delete`（不洩漏 `Path`）、temp+atomic move
+  - [x] C.2.2 測試 byte-oriented `store/read/delete`（不洩漏 `Path`）、temp+atomic move
     （final 存在性、可讀、byteSize/contentType/寬高/sha256 與 metadata 一致）。
-  - [ ] C.2.3 測試 symlink/path-escape（absolute、dot segment、separator、grammar 外 key
+  - [x] C.2.3 測試 symlink/path-escape（absolute、dot segment、separator、grammar 外 key
     與 symlink final target）拒絕、corrupt/missing file 行為與 compensating delete。
-- [ ] **C.3 GREEN/REFACTOR — Validator/storage wiring**
-  - [ ] C.3.1 實作 `ImageValidator`（dimension-before-decode、signature + `ImageIO`、
+- [x] **C.3 GREEN/REFACTOR — Validator/storage wiring**
+  - [x] C.3.1 實作 `ImageValidator`（dimension-before-decode、signature + `ImageIO`、
     dimension/pixel/byteSize/sha256）。
-  - [ ] C.3.2 實作 `MediaStorage` interface + `LocalMediaStorage`（server UUID key、
+  - [x] C.3.2 實作 `MediaStorage` interface + `LocalMediaStorage`（server UUID key、
     key grammar、temp+atomic move、guarded resolve、byte-oriented read/delete）。
-  - [ ] C.3.3 執行 focused validator/storage 與完整 backend suite。
+  - [x] C.3.3 執行 focused validator/storage 與完整 backend suite。
 
 ## D：Multipart create 與 media read HTTP API
 
