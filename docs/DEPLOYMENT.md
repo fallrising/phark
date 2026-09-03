@@ -1,6 +1,6 @@
 # VPS 部署指南
 
-> 最後更新：2026-07-13
+> 最後更新：2026-09-03
 
 本指南描述如何將 **Stream Deck**（repository：`fallrising/phark`）部署到單台 Ubuntu VPS，實現可重現、可回滾的 CI/CD 流程。
 
@@ -175,6 +175,7 @@ docker run --rm \
   --name deck-local \
   -p 8080:8080 \
   -e APP_DB_PATH=/data/deck.db \
+  -e APP_MEDIA_PATH=/data/media \
   -e SPRING_PROFILES_ACTIVE=prod \
   -e SESSION_COOKIE_SECURE=false \
   -v "$(pwd)/.local-data:/data" \
@@ -191,6 +192,33 @@ curl -fsS http://127.0.0.1:8080/api/posts
 瀏覽器開啟 http://127.0.0.1:8080，確認 register/login、三欄版面、authenticated
 發文／回覆與 profile。`SESSION_COOKIE_SECURE=false` 只供這個本機 HTTP smoke；VPS
 經 Traefik HTTPS 時不要覆寫 production profile 的 `true` 預設。
+
+Media runtime smoke（真實 upload → read → restart → re-read；以真實 GET bytes
+與 sha256sum 位元組相等為證據，不只 HEAD）：
+
+```bash
+# 以 composer 附上一張 JPEG/PNG 圖片建立 post，確認 Post.image 非 null
+# 記錄傳回的 /api/media/<id>
+
+# restart 前以真實 GET 下載 bytes，保存 baseline
+curl -fsS -o /tmp/media-before.bin "http://127.0.0.1:8080/api/media/<id>"
+
+# 重啟 container
+docker restart deck-local
+curl -fsS http://127.0.0.1:8080/actuator/health
+
+# restart 後再次真實 GET，並以 sha256sum/cmp 驗證 bytes 完全一致
+# （bytes 在 .local-data/media，restart 後仍在；僅 process-memory session 遺失）
+curl -fsS -o /tmp/media-after.bin "http://127.0.0.1:8080/api/media/<id>"
+sha256sum /tmp/media-before.bin /tmp/media-after.bin
+cmp /tmp/media-before.bin /tmp/media-after.bin \
+  && echo "media bytes identical across restart" || exit 1
+```
+
+Image bytes 與 SQLite 都落在單一 `.local-data`（container 內為 `/data`）：
+`deck.db` 存 metadata、`media/` 存 bytes。**Restart 保留已上傳的 media bytes 與
+posts**；session 儲存在 application memory，因此 restart 會登出既有使用者——這是
+單 instance 架構的已知限制（見步驟 6）。
 
 ---
 
@@ -219,6 +247,12 @@ sudo chown deploy:deploy /opt/apps/deck/compose.yml
 sudo chown deploy:deploy /opt/apps/deck/.env
 ```
 
+**Production 資料 layout**：單一 `/data` volume（compose 的 `./data:/data`）同時
+涵蓋 `deck.db`（SQLite metadata）與 `media/`（image bytes）。compose template 已
+設定 `APP_MEDIA_PATH=/data/media`；`/data/media` 由容器內 app（UID 10001）在
+首次寫入時自動建立，並應屬 `10001:10001`（上述 `chown -R 10001:10001 .../data`
+已涵蓋）。任何權限問題用下方「常見錯誤定位」的 chown 指令修復。
+
 ```bash
 sudo -iu deploy
 cd /opt/apps/deck
@@ -229,7 +263,9 @@ docker compose config
 
 Production session cookie 為 Secure、HttpOnly、SameSite=Lax，idle timeout 預設
 30 分鐘。Session 儲存在 application memory，因此 deploy/restart 會登出既有
-使用者；這是目前單 instance 架構的已知限制。
+使用者；這是目前單 instance 架構的已知限制。**Restart 不會清除 SQLite 或
+`/data/media` 下的 bytes**：已上傳的 posts 與 media 在 restart/upgrade 後仍保留，
+只有 process-memory session 遺失。
 
 ---
 
@@ -463,11 +499,15 @@ docker logs --tail=200 deck-app
 docker inspect deck-app --format '{{json .State.Health}}'
 ```
 
-### SQLite `permission denied`
+### SQLite / media `permission denied`
 
 ```bash
 sudo chown -R 10001:10001 /opt/apps/deck/data
 sudo chmod 755 /opt/apps/deck/data
+
+# media 寫入失敗時（`/data/media` 由 app 以 UID 10001 建立），確認同樣屬主：
+sudo ls -ld /opt/apps/deck/data/media
+sudo chown -R 10001:10001 /opt/apps/deck/data/media
 ```
 
 ### 憑證未簽發
