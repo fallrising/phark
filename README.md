@@ -54,6 +54,7 @@ curl -fsS http://localhost:8080/actuator/health
 | POST | `/api/posts/{postId}/replies` | 以 session identity 建立單層回覆 |
 | GET | `/api/notifications?limit=20&before=...` | 已登入收件者的通知分頁（需登入） |
 | PUT | `/api/notifications/read` | 將通知標為已讀（需登入與 CSRF） |
+| GET | `/api/search?q=...&limit=20&before=...` | 公開 original post 全文搜尋分頁（viewer-aware） |
 | GET | `/api/profiles/{handle}` | 公開 profile |
 | PATCH | `/api/profiles/me` | 修改自己的 display name/bio |
 | GET | `/api/profiles/{handle}/posts` | 該帳號的 cursor-paginated original/repost activities |
@@ -66,6 +67,17 @@ curl -fsS http://localhost:8080/actuator/health
 與 `repostedByViewer=false`。轉發 activity 包含 nullable 的 `repostedBy`、
 `repostedByHandle`、`repostedAt` attribution；original activity 的 attribution
 為 null。每個 item 都有 non-null `timelineEntryId` 作為 stable opaque dedup key。
+
+`GET /api/search` 是 public 的 original post 全文搜尋（replies 不索引），回傳與 timeline
+相同的 `{ "items": [...], "nextCursor": "..." }` envelope。`q` 為必填 plain terms，trim
+後 1–100 個 Unicode code points、1–8 個 terms，每 term 至少含一個 Unicode letter/digit；
+`limit` 預設 20、範圍 1–50。`nextCursor` 是 search 專屬的 opaque `s1:` Base64URL cursor
+（`s1:<epoch-second>:<positive-id>`），不接受 timeline/notification cursor；分頁以
+`(created_at DESC, id DESC)` 做確定性 keyset。結果含 viewer 相依欄位（anonymous 為
+boolean `false`），response 一律 `Cache-Control: private, no-store`。`/search?q=...`
+SPA route 支援 direct load、navigation/back、loading/empty/error、load-more dedupe 與
+session 變更時以新身份重跑。完整契約見
+[開發指南的搜尋端點](docs/DEVELOPMENT.md#get-apisearch)。
 
 通知端點需要 authenticated session：`GET /api/notifications` 回傳目前收件者的
 通知分頁 `{ "items": [...], "nextCursor": ..., "latestCursor": ...,
@@ -111,4 +123,5 @@ Browser client 啟動時先並行取得 CSRF token 與 session，所有 `POST`�
 - [x] Per-account 冪等 likes 與 optimistic UI
 - [x] Per-account 冪等 reposts、original attribution 與 mixed timeline fan-out
 - [x] Per-account 通知中心與 unread badge
+- [ ] Original post 全文搜尋（FTS5、`s1:` cursor 與 `/search` 已實作；production delivery 驗證 pending）
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）

@@ -1,7 +1,7 @@
 # Schema Migration Production Runbook
 
 > 適用於 deck 應用（`deck` Compose project），基於 Flyway + SQLite。
-> 最後更新：2026-09-02
+> 最後更新：2026-09-03
 
 ---
 
@@ -166,7 +166,8 @@ baseline 或 migration 順序有落差。
 
 SDD-007 release 的預期 latest version 是 V6 `add post reposts`。SDD-008
 （notifications）release 的預期 latest version 是 V7 `add notifications`，兩張新
-table 都不回填既有資料。V4 新增
+table 都不回填既有資料。SDD-009（search）release 的預期 latest version 是 V8
+`add post search`；V8 是**目前最新** migration。V4 新增
 `accounts`、nullable `posts.author_account_id`、nullable
 `replies.author_account_id` 與對應 indexes。升級 V3 或 legacy baseline 時不得依
 `author` 字串建立 account；所有既有 ownership 必須保持 `NULL`，既有 row、ID、
@@ -201,6 +202,62 @@ table 都為空；從 populated V6 升級時所有既有的 accounts、posts、r
 reposts、IDs 與 timestamps 都必須保留，notification 資料只會從部署後的新互動開始
 累積。回滾 V7 application image 時仍需同時還原部署前 database backup；舊 image 不
 認識 V7 schema，不能只切回 image 就宣稱 rollback 完成。
+
+V8 是 SDD-009（search）的 migration，新增 **external-content FTS5 virtual table**
+`search_posts`（`content='posts'`、`content_rowid='id'`、
+`tokenize='unicode61 remove_diacritics 2'`）。這是**全量回填** migration（與 V5–V7 的
+新表為空不同）：migration 內部的 `INSERT INTO search_posts(search_posts)
+VALUES('rebuild')` 在 migration-time 把全部既有 original posts.content 建成索引，
+因此部署完成後既有原文立即可被搜尋；`posts` 仍是 source of truth，FTS table 只保存
+index 與 mirror `posts.id` 的 rowid。三個 trigger（`posts_search_ai` AFTER INSERT、
+`posts_search_ad` AFTER DELETE、`posts_search_au` AFTER UPDATE OF content）與 posts
+mutation 同一 transaction，任一 trigger 失敗 rollback 整個 post 寫入（fail-closed），
+不會留下部分狀態。從 populated V7 升級時所有既有的 accounts、posts、replies、likes、
+reposts、notifications、IDs 與 timestamps 都必須保留；replies 不索引。
+
+部署後檢查（應用已健康、無進行中寫入）：
+
+```bash
+sudo sqlite3 /opt/apps/deck/data/deck.db "PRAGMA integrity_check;"
+# 預期: ok
+
+sudo sqlite3 /opt/apps/deck/data/deck.db \
+  "SELECT type, name FROM sqlite_master
+   WHERE name IN ('search_posts','posts_search_ai','posts_search_ad','posts_search_au');"
+# 預期: search_posts 的 type 為 table，三個 trigger 的 type 為 trigger
+```
+
+FTS5 外部內容的一致性驗證是 write-like command，必須在**應用停止、無任何寫入**時
+執行；這是 shipped migration test（`SchemaMigrationConfigTest`）使用的同一
+integrity-check，不是一般 row count/JOIN 可比（那些只讀 content projection，不能證明
+FTS index 已回填）：
+
+```bash
+sudo -iu deploy
+cd /opt/apps/deck
+docker compose stop --timeout 30 app
+
+sudo sqlite3 /opt/apps/deck/data/deck.db \
+  "INSERT INTO search_posts(search_posts, rank) VALUES('integrity-check', 1);"
+# 成功時無輸出；FTS index 與 posts content 不一致時 SQLite 會回報錯誤
+
+# 重新啟動並確認健康
+docker compose up -d --no-deps --wait --wait-timeout 90 app
+docker compose ps            # deck-app 應顯示 Up (healthy)
+docker exec deck-app \
+  curl -fsS http://127.0.0.1:8080/actuator/health   # 預期: {"status":"UP"}
+```
+
+FTS maintenance 同樣只在應用停止、無寫入時執行：以 host sqlite3 執行 `INSERT INTO
+search_posts(search_posts) VALUES('optimize');` 合併 index segments，完成後重新
+啟動。**不得**在應用仍有寫入時執行 `rebuild`/`optimize`/`integrity-check`。V8 與其
+trigger/Flyway history 都是 immutable：不手動編輯 `V8__add_post_search.sql`、不手動
+DELETE flyway_schema_history rows、不執行 `flyway repair` 或 `flyway clean`；任何修正
+走新版本。回滾 V8 application image 時**必須**同時還原部署前 database backup：image
+rollback 不會復原 forward migration，舊 image 搭配已 migration 的 V8 schema 是未驗證、
+不支援的組合。殘留的 `search_posts` trigger 本身可獨立繼續執行（仍會同步 FTS），但
+這不保證舊 image 在新 schema 上的行為；schema 回滾一律要求與 pre-upgrade 相符的 DB
+backup，不能只切回 image 就宣稱 rollback 完成。
 
 ---
 
@@ -299,13 +356,13 @@ schema 回滾必須從 `.backup` 還原資料庫檔案。
 
 ```text
 === Migration Deploy Report ===
-Date:         2026-07-30T12:00:00Z
+Date:         2026-09-03T12:00:00Z
 Old image:    ghcr.io/fallrising/phark:sha-abc123...
 New image:    ghcr.io/fallrising/phark:sha-def456...
-Backup:       /opt/apps/deck/backups/deck-20260730T120000Z.db
+Backup:       /opt/apps/deck/backups/deck-20260903T120000Z.db
 Integrity:    ok
 Container:    Up (healthy)
-Migration:    V1 ~ V6 success = 1
+Migration:    V1 ~ V8 success = 1
 Result:       SUCCESS / FAILED → restored to abc123...
 ```
 
