@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react"
 import { LayoutGrid } from "lucide-react"
 
 import {
@@ -23,7 +29,10 @@ import { Column } from "@/components/Column"
 import { Composer } from "@/components/Composer"
 import { NotificationView } from "@/components/NotificationView"
 import { ProfileView } from "@/components/ProfileView"
+import { SearchView } from "@/components/SearchView"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   applyLikeStateToPosts,
   optimisticLikeState,
@@ -62,6 +71,7 @@ type Route =
   | { kind: "home" }
   | { kind: "profile"; handle: string }
   | { kind: "notifications" }
+  | { kind: "search"; query: string }
   | { kind: "not-found" }
 
 function emptyFeeds(): Record<Channel, ChannelFeed> {
@@ -120,6 +130,10 @@ function readRoute(): Route {
   if (/^\/notifications\/?$/.test(window.location.pathname)) {
     return { kind: "notifications" }
   }
+  if (/^\/search\/?$/.test(window.location.pathname)) {
+    const query = new URLSearchParams(window.location.search).get("q") ?? ""
+    return { kind: "search", query }
+  }
   const profileMatch = window.location.pathname.match(/^\/profiles\/([^/]+)\/?$/)
   if (profileMatch) {
     try {
@@ -144,6 +158,7 @@ export default function App() {
   const [securityReady, setSecurityReady] = useState<boolean | null>(null)
   const [identityError, setIdentityError] = useState<string | null>(null)
   const [route, setRoute] = useState<Route>(readRoute)
+  const [headerSearchQuery, setHeaderSearchQuery] = useState("")
   const [profileRefreshVersion, setProfileRefreshVersion] = useState(0)
   const [pendingLikeIds, setPendingLikeIds] = useState<Set<number>>(new Set())
   const [likeErrors, setLikeErrors] = useState<Record<number, string>>({})
@@ -595,6 +610,30 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" })
   }, [refreshNotifications, sessionAccount])
 
+  const navigateSearch = useCallback((query: string) => {
+    const trimmedQuery = query.trim()
+    const params = new URLSearchParams()
+    if (trimmedQuery !== "") {
+      params.set("q", trimmedQuery)
+    }
+    const queryString = params.toString()
+    window.history.pushState(
+      null,
+      "",
+      queryString ? `/search?${queryString}` : "/search"
+    )
+    setRoute({ kind: "search", query: trimmedQuery })
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }, [])
+
+  const handleHeaderSearchSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      navigateSearch(headerSearchQuery.trim())
+    },
+    [headerSearchQuery, navigateSearch]
+  )
+
   const handleAccountChanged = useCallback(
     async (account: AccountProfile | null) => {
       setSessionAccount(account)
@@ -649,11 +688,19 @@ export default function App() {
   }, [refreshNotifications, sessionAccount])
 
   useEffect(() => {
-    document.title = route.kind === "profile"
-      ? `@${route.handle} · Phark`
-      : route.kind === "notifications"
-        ? "Notifications · Phark"
-        : "Phark"
+    setHeaderSearchQuery(route.kind === "search" ? route.query : "")
+  }, [route])
+
+  useEffect(() => {
+    const displayQuery = route.kind === "search" ? route.query.trim() : ""
+    document.title =
+      route.kind === "search"
+        ? `Search${displayQuery ? `: ${displayQuery}` : ""} · Phark`
+        : route.kind === "profile"
+          ? `@${route.handle} · Phark`
+          : route.kind === "notifications"
+            ? "Notifications · Phark"
+            : "Phark"
   }, [route])
 
   return (
@@ -679,6 +726,29 @@ export default function App() {
             </span>
           </button>
 
+          <form
+            role="search"
+            className="w-full md:w-auto"
+            onSubmit={handleHeaderSearchSubmit}
+          >
+            <Label htmlFor="header-search-query" className="sr-only">
+              Search posts
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="header-search-query"
+                value={headerSearchQuery}
+                onChange={(event) => setHeaderSearchQuery(event.target.value)}
+                placeholder="Search posts"
+                aria-label="Search posts"
+                className="h-9 md:w-56"
+              />
+              <Button type="submit" variant="outline" size="sm">
+                Search
+              </Button>
+            </div>
+          </form>
+
           <AccountControls
             account={sessionAccount}
             securityReady={securityReady}
@@ -696,7 +766,7 @@ export default function App() {
         ) : null}
       </header>
 
-      {route.kind !== "notifications" ? (
+      {route.kind !== "notifications" && route.kind !== "search" ? (
         <Composer
           account={sessionAccount}
           onAuthRequest={requestAuthentication}
@@ -734,6 +804,16 @@ export default function App() {
           onAuthRequest={requestAuthentication}
           onNavigateProfile={navigateProfile}
           onProfileUpdated={handleProfileUpdated}
+        />
+      ) : route.kind === "search" ? (
+        <SearchView
+          query={route.query}
+          sessionAccount={sessionAccount}
+          securityReady={securityReady}
+          onSubmitQuery={navigateSearch}
+          onBack={navigateHome}
+          onAuthRequest={requestAuthentication}
+          onNavigateProfile={navigateProfile}
         />
       ) : route.kind === "not-found" ? (
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6">
