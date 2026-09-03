@@ -1,10 +1,11 @@
+import { useState } from "react"
 import type { AccountProfile } from "@/api/accounts"
 import { Heart, Repeat2 } from "lucide-react"
 import { AuthorLink } from "@/components/AuthorLink"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ReplyThread } from "@/components/ReplyThread"
-import type { Post } from "@/types/post"
+import type { Post, PostImage } from "@/types/post"
 
 interface PostCardProps {
   post: Post
@@ -25,6 +26,31 @@ function formatTimestamp(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value))
+}
+
+function PostImage({ image, author }: { image: PostImage; author: string }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+
+  if (failedUrl === image.url) {
+    return (
+      <p className="rounded-lg border border-border/60 bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+        Image unavailable.
+      </p>
+    )
+  }
+
+  return (
+    <img
+      src={image.url}
+      alt={`Post image by ${author}`}
+      width={image.width}
+      height={image.height}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailedUrl(image.url)}
+      className="h-auto max-h-96 w-full rounded-lg border border-border/60 object-contain"
+    />
+  )
 }
 
 export function PostCard({
@@ -76,6 +102,9 @@ export function PostCard({
         <p className="whitespace-pre-wrap text-sm leading-relaxed">
           {post.content}
         </p>
+        {post.image !== null ? (
+          <PostImage image={post.image} author={post.author} />
+        ) : null}
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
             <Button

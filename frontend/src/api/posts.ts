@@ -65,6 +65,22 @@ export function createPost(request: CreatePostRequest): Promise<Post> {
   })
 }
 
+export function createPostWithImage(
+  request: CreatePostRequest,
+  image: File
+): Promise<Post> {
+  const form = new FormData()
+  form.append(
+    "post",
+    new Blob([JSON.stringify(request)], { type: "application/json" })
+  )
+  form.append("image", image)
+  return apiRequest<Post>("/api/posts", {
+    method: "POST",
+    body: form,
+  })
+}
+
 export function likePost(postId: number): Promise<LikeState> {
   return apiRequest<LikeState>(`/api/posts/${postId}/like`, {
     method: "PUT",
