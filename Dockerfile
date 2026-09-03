@@ -22,8 +22,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin app \
-    && mkdir -p /data \
-    && chown 10001:10001 /data
+    && mkdir -p /data /data/media \
+    && chown 10001:10001 /data /data/media
 
 WORKDIR /app
 COPY --from=backend-build /build/backend/target/deck-1.0.0.jar /app/app.jar
@@ -32,6 +32,7 @@ RUN chown 10001:10001 /app/app.jar
 USER 10001:10001
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV APP_DB_PATH=/data/deck.db
+ENV APP_MEDIA_PATH=/data/media
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
