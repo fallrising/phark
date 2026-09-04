@@ -134,14 +134,16 @@ class AbuseRateLimitContractTest {
                 .andExpect(status().isForbidden()).andExpect(header().doesNotExist("RateLimit-Limit"));
         org.assertj.core.api.Assertions.assertThat(count("abuse_rate_limit_buckets")).isZero();
 
-        mockMvc.perform(post("/api/posts/1/reports").with(user(new AccountPrincipal(9, "user", null)))
-                        .with(csrf()).with(remote("198.51.100.13")))
+        mockMvc.perform(post("/api/posts/999999999/reports").with(user(new AccountPrincipal(9, "user", null)))
+                        .with(csrf()).with(remote("198.51.100.13"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"SPAM\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(header().string("RateLimit-Limit", "10"))
                 .andExpect(header().string("RateLimit-Remaining", "9"));
 
-        mockMvc.perform(post("/api/replies/1/reports").with(user(new AccountPrincipal(10, "reply-user", null)))
-                        .with(csrf()).with(remote("198.51.100.14")))
+        mockMvc.perform(post("/api/replies/999999999/reports").with(user(new AccountPrincipal(10, "reply-user", null)))
+                        .with(csrf()).with(remote("198.51.100.14"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"SPAM\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(header().string("RateLimit-Limit", "10"))
                 .andExpect(header().string("RateLimit-Remaining", "9"));

@@ -116,6 +116,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             code = switch (mex.getName()) {
                 case "limit" -> ApiErrorCode.INVALID_LIMIT;
                 case "postId" -> ApiErrorCode.INVALID_POST_ID;
+                case "replyId" -> ApiErrorCode.INVALID_REPLY_ID;
                 case "mediaId" -> ApiErrorCode.INVALID_MEDIA_ID;
                 default -> ApiErrorCode.MALFORMED_REQUEST;
             };
