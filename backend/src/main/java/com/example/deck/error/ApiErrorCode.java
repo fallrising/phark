@@ -49,7 +49,9 @@ public enum ApiErrorCode {
     UNSUPPORTED_MEDIA_TYPE("urn:phark:problem:unsupported-media-type", HttpStatus.UNSUPPORTED_MEDIA_TYPE,
             "Unsupported media type", "The request content type is not supported."),
     INTERNAL_ERROR("urn:phark:problem:internal-error", HttpStatus.INTERNAL_SERVER_ERROR,
-            "Internal server error", "An unexpected error occurred.");
+            "Internal server error", "An unexpected error occurred."),
+    RATE_LIMITED("urn:phark:problem:rate-limited", HttpStatus.TOO_MANY_REQUESTS,
+            "Rate limit exceeded", "Too many requests. Please try again later.");
 
     private final URI type;
     private final HttpStatus httpStatus;
