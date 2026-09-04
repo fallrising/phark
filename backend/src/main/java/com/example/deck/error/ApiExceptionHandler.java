@@ -3,7 +3,10 @@ package com.example.deck.error;
 import com.example.deck.web.RequestIdFilter;
 import com.example.deck.service.ImageTooLargeException;
 import com.example.deck.service.InvalidImageException;
+import com.example.deck.service.RateLimitExceededException;
+import com.example.deck.web.RateLimitHeaders;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -46,6 +49,17 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 request.getRequestURI(),
                 ex.getDetail(),
                 RequestIdFilter.resolveRequestId(request));
+        return new ResponseEntity<>(problem, code.getHttpStatus());
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<Object> handleRateLimitExceeded(
+            RateLimitExceededException ex, HttpServletRequest request, HttpServletResponse response) {
+        ApiErrorCode code = ApiErrorCode.RATE_LIMITED;
+        ProblemDetail problem = problemWriter.build(
+                code, request.getRequestURI(), code.getDefaultDetail(),
+                RequestIdFilter.resolveRequestId(request));
+        RateLimitHeaders.write(response, ex);
         return new ResponseEntity<>(problem, code.getHttpStatus());
     }
 
