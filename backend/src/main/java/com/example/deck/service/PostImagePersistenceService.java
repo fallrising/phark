@@ -18,11 +18,15 @@ public class PostImagePersistenceService {
 
     private final PostRepository postRepository;
     private final PostImageRepository postImageRepository;
+    private final AbuseSignalRecorder signalRecorder;
 
     public PostImagePersistenceService(
-            PostRepository postRepository, PostImageRepository postImageRepository) {
+            PostRepository postRepository,
+            PostImageRepository postImageRepository,
+            AbuseSignalRecorder signalRecorder) {
         this.postRepository = postRepository;
         this.postImageRepository = postImageRepository;
+        this.signalRecorder = signalRecorder;
     }
 
     @Transactional
@@ -31,7 +35,8 @@ public class PostImagePersistenceService {
             String content,
             String channel,
             String storageKey,
-            ValidatedImage validated) {
+            ValidatedImage validated,
+            String ipHmac) {
         Post post = postRepository.insertOwned(accountId, content, channel);
         postImageRepository.insert(
                 post.id(),
@@ -41,6 +46,7 @@ public class PostImagePersistenceService {
                 validated.width(),
                 validated.height(),
                 validated.sha256());
+        signalRecorder.recordPostCreated(accountId, post.id(), ipHmac);
         return postRepository
                 .findById(post.id())
                 .orElseThrow(

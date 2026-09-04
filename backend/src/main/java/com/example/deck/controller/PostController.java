@@ -6,7 +6,9 @@ import com.example.deck.error.ApiException;
 import com.example.deck.model.Post;
 import com.example.deck.model.PostPage;
 import com.example.deck.security.AccountPrincipal;
+import com.example.deck.service.ClientSignalHasher;
 import com.example.deck.service.PostService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -27,9 +29,11 @@ import org.springframework.web.multipart.MultipartFile;
 public class PostController {
 
     private final PostService postService;
+    private final ClientSignalHasher signalHasher;
 
-    public PostController(PostService postService) {
+    public PostController(PostService postService, ClientSignalHasher signalHasher) {
         this.postService = postService;
+        this.signalHasher = signalHasher;
     }
 
     @GetMapping
@@ -48,11 +52,13 @@ public class PostController {
     @ResponseStatus(HttpStatus.CREATED)
     public Post createPost(
             @AuthenticationPrincipal AccountPrincipal principal,
-            @Valid @RequestBody CreatePostRequest request) {
+            @Valid @RequestBody CreatePostRequest request,
+            HttpServletRequest servletRequest) {
         if (principal == null) {
             throw new ApiException(ApiErrorCode.AUTHENTICATION_REQUIRED);
         }
-        return postService.createPost(principal.getAccountId(), request);
+        String ipHmac = signalHasher.hashIp(servletRequest.getRemoteAddr());
+        return postService.createPost(principal.getAccountId(), request, ipHmac);
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -60,10 +66,13 @@ public class PostController {
     public Post createPostWithImage(
             @AuthenticationPrincipal AccountPrincipal principal,
             @Valid @RequestPart("post") CreatePostRequest request,
-            @RequestPart("image") MultipartFile image) {
+            @RequestPart("image") MultipartFile image,
+            HttpServletRequest servletRequest) {
         if (principal == null) {
             throw new ApiException(ApiErrorCode.AUTHENTICATION_REQUIRED);
         }
-        return postService.createPostWithImage(principal.getAccountId(), request, image);
+        String ipHmac = signalHasher.hashIp(servletRequest.getRemoteAddr());
+        return postService.createPostWithImage(
+                principal.getAccountId(), request, image, ipHmac);
     }
 }

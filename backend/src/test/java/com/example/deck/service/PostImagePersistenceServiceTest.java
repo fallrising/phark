@@ -51,6 +51,7 @@ class PostImagePersistenceServiceTest {
 
     @BeforeEach
     void resetDatabase() {
+        jdbcClient.sql("DELETE FROM abuse_signals").update();
         jdbcClient.sql("DELETE FROM post_images").update();
         jdbcClient.sql("DELETE FROM post_likes").update();
         jdbcClient.sql("DELETE FROM post_reposts").update();
@@ -66,7 +67,8 @@ class PostImagePersistenceServiceTest {
         byte[] bytes = jpeg(1200, 800);
 
         Post post = persistenceService.createOwnedWithImage(
-                alice.id(), "hello image", "home", "t006-key-1", validated(bytes));
+                alice.id(), "hello image", "home", "t006-key-1", validated(bytes),
+                "a".repeat(64));
 
         assertThat(post.id()).isPositive();
         assertThat(post.content()).isEqualTo("hello image");
@@ -83,6 +85,8 @@ class PostImagePersistenceServiceTest {
         assertThat(queryString("SELECT storage_key FROM post_images")).isEqualTo("t006-key-1");
         assertThat(queryString("SELECT content_type FROM post_images")).isEqualTo("image/jpeg");
         assertThat(queryLong("SELECT byte_size FROM post_images")).isEqualTo(bytes.length);
+        assertThat(count("abuse_signals")).isEqualTo(1);
+        assertThat(queryLong("SELECT post_id FROM abuse_signals")).isEqualTo(post.id());
     }
 
     @Test
@@ -98,11 +102,13 @@ class PostImagePersistenceServiceTest {
                 "not-a-sha256");
 
         assertThatThrownBy(() -> persistenceService.createOwnedWithImage(
-                        alice.id(), "hello image", "home", "t006-key-2", invalid))
+                        alice.id(), "hello image", "home", "t006-key-2", invalid,
+                        "a".repeat(64)))
                 .isInstanceOf(DataAccessException.class);
 
         assertThat(count("posts")).isZero();
         assertThat(count("post_images")).isZero();
+        assertThat(count("abuse_signals")).isZero();
     }
 
     @Test
@@ -110,14 +116,17 @@ class PostImagePersistenceServiceTest {
         Account alice = accountRepository.insert("alice", "Alice", "hash");
         byte[] bytes = jpeg(20, 20);
         persistenceService.createOwnedWithImage(
-                alice.id(), "first", "home", "t006-dup", validated(bytes));
+                alice.id(), "first", "home", "t006-dup", validated(bytes),
+                "a".repeat(64));
 
         assertThatThrownBy(() -> persistenceService.createOwnedWithImage(
-                        alice.id(), "second", "home", "t006-dup", validated(bytes)))
+                        alice.id(), "second", "home", "t006-dup", validated(bytes),
+                        "b".repeat(64)))
                 .isInstanceOf(DataAccessException.class);
 
         assertThat(count("posts")).isEqualTo(1);
         assertThat(count("post_images")).isEqualTo(1);
+        assertThat(count("abuse_signals")).isEqualTo(1);
         assertThat(queryString("SELECT content FROM posts")).isEqualTo("first");
     }
 
