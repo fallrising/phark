@@ -50,6 +50,8 @@ class ReportAbuseSignalContractTest {
     @AfterEach
     void cleanAccounts() {
         for (long accountId : accountIds) {
+            jdbc.sql("DELETE FROM posts WHERE author_account_id = :id")
+                    .param("id", accountId).update();
             jdbc.sql("DELETE FROM accounts WHERE id = :id").param("id", accountId).update();
         }
         accountIds.clear();
