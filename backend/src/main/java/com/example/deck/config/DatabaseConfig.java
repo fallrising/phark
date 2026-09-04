@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import javax.sql.DataSource;
+import org.sqlite.SQLiteConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,6 +32,10 @@ public class DatabaseConfig {
         dataSource.setJdbcUrl("jdbc:sqlite:" + dbPath);
         dataSource.setDriverClassName("org.sqlite.JDBC");
         dataSource.setMaximumPoolSize(1);
+        SQLiteConfig sqliteConfig = new SQLiteConfig();
+        sqliteConfig.enforceForeignKeys(true);
+        sqliteConfig.setBusyTimeout(5000);
+        dataSource.setDataSourceProperties(sqliteConfig.toProperties());
 
         applyPragmas(dataSource);
         return dataSource;
@@ -45,8 +50,6 @@ public class DatabaseConfig {
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute("PRAGMA journal_mode=WAL");
-            statement.execute("PRAGMA foreign_keys=ON");
-            statement.execute("PRAGMA busy_timeout=5000");
         }
     }
 }

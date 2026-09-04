@@ -53,6 +53,8 @@ curl -fsS http://localhost:8080/actuator/health
 | DELETE | `/api/posts/{postId}/repost` | 冪等取消轉發（需登入與 CSRF） |
 | GET | `/api/posts/{postId}/replies?limit=20&after=...` | 正序讀取回覆 |
 | POST | `/api/posts/{postId}/replies` | 以 session identity 建立單層回覆 |
+| POST | `/api/posts/{postId}/reports` | 檢舉文章（需登入與 CSRF；固定 reason、無自由文字） |
+| POST | `/api/replies/{replyId}/reports` | 檢舉回覆（需登入與 CSRF；固定 reason、無自由文字） |
 | GET | `/api/notifications?limit=20&before=...` | 已登入收件者的通知分頁（需登入） |
 | PUT | `/api/notifications/read` | 將通知標為已讀（需登入與 CSRF） |
 | GET | `/api/search?q=...&limit=20&before=...` | 公開 original post 全文搜尋分頁（viewer-aware） |

@@ -21,33 +21,37 @@
 
 ## Phase 2 — Rate Limiting and Privacy Boundary
 
-- [ ] RED: keyed hashing, canonicalization, fixed-window, atomic dual-policy,
+- [x] RED: keyed hashing, canonicalization, fixed-window, atomic dual-policy,
   headers, 429, auth/CSRF ordering, and redaction tests.
-- [ ] GREEN: client signal boundary, persistent repository/service, MVC interceptor,
+- [x] GREEN: client signal boundary, persistent repository/service, MVC interceptor,
   RFC 9457 error, and config/deployment secret wiring.
-- [ ] Refactor with all focused tests green and adversarially review trust/concurrency.
+- [x] Refactor with all focused tests green and adversarially review trust/concurrency.
 
 ## Phase 3 — Reports and Abuse Signals
 
-- [ ] RED: post/reply report success, duplicate, invalid reason/ID/target,
+- [x] RED: post/reply report success, duplicate, invalid reason/ID/target,
   authorization, isolation, redaction, and rollback tests.
-- [ ] GREEN: report model/DTO/repository/service/controller and security matcher.
-- [ ] RED/GREEN: atomically record post/reply/report signals, including image-post
+- [x] GREEN: report model/DTO/repository/service/controller and security matcher.
+- [x] RED/GREEN: atomically record post/reply/report signals, including image-post
   compensation and forced rollback failures.
-- [ ] Add startup/daily retention cleanup and prove live rows survive.
+- [x] Add startup/daily retention cleanup and prove live rows survive.
 
 ## Phase 4 — Frontend and Documentation
 
-- [ ] Add typed report API and accessible post/reply report controls.
-- [ ] Run frontend lint/build.
-- [ ] Update README, ROADMAP, architecture, development, migration, deployment,
+- [x] Add typed report API and accessible post/reply report controls.
+- [x] Run frontend lint/build.
+- [x] Update README, ROADMAP, architecture, development, migration, deployment,
   and verification docs to match final behavior.
 
-## Phase 5 — Evidence, PR, and Merge
+## Phase 5 — Release Gate
 
-- [ ] Full backend suite with test count; frontend lint/build.
-- [ ] Clean and populated migration evidence.
-- [ ] Docker image build, digest, and runtime moderation matrix including restart.
-- [ ] Independent final review and evidence gate.
-- [ ] Commit/push, open PR, wait for final-head CI, merge, wait for post-merge master CI.
-- [ ] Confirm open issues/deployments, synchronized clean master, and no deploy.
+These external delivery checks are recorded in the PR, CI runs, and final handoff
+rather than as durable source checkboxes, because final-head and post-merge evidence
+only exists after this branch version is committed:
+
+- Full backend suite with test count; frontend lint/build.
+- Clean and populated migration evidence.
+- Docker image build, digest, and runtime moderation matrix including restart.
+- Independent final review and evidence gate.
+- Commit/push, open PR, wait for final-head CI, merge, wait for post-merge master CI.
+- Confirm open issues/deployments, synchronized clean master, and no deploy.
