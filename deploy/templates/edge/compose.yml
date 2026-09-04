@@ -19,11 +19,13 @@ services:
       - "--providers.docker.network=proxy"
 
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.forwardedHeaders.insecure=false"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
 
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.forwardedHeaders.insecure=false"
 
       - "--certificatesresolvers.le.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
@@ -31,6 +33,12 @@ services:
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
 
       - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--accesslog.fields.headers.defaultmode=drop"
+      - "--accesslog.fields.queryparameters.defaultmode=drop"
+      - "--accesslog.fields.names.ClientAddr=drop"
+      - "--accesslog.fields.names.ClientHost=drop"
+      - "--accesslog.fields.names.ClientPort=drop"
       - "--log.level=INFO"
 
     ports:

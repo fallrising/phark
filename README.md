@@ -53,6 +53,8 @@ curl -fsS http://localhost:8080/actuator/health
 | DELETE | `/api/posts/{postId}/repost` | 冪等取消轉發（需登入與 CSRF） |
 | GET | `/api/posts/{postId}/replies?limit=20&after=...` | 正序讀取回覆 |
 | POST | `/api/posts/{postId}/replies` | 以 session identity 建立單層回覆 |
+| POST | `/api/posts/{postId}/reports` | 檢舉文章（需登入與 CSRF；固定 reason、無自由文字） |
+| POST | `/api/replies/{replyId}/reports` | 檢舉回覆（需登入與 CSRF；固定 reason、無自由文字） |
 | GET | `/api/notifications?limit=20&before=...` | 已登入收件者的通知分頁（需登入） |
 | PUT | `/api/notifications/read` | 將通知標為已讀（需登入與 CSRF） |
 | GET | `/api/search?q=...&limit=20&before=...` | 公開 original post 全文搜尋分頁（viewer-aware） |
@@ -142,4 +144,5 @@ Browser client 啟動時先並行取得 CSRF token 與 session，所有 `POST`�
 - [x] Per-account 通知中心與 unread badge
 - [x] Original post 全文搜尋（FTS5、`s1:` cursor 與 `/search`）
 - [x] 媒體附件（SDD-010：multipart create、公開 media GET、lazy rendering；見 [docs/specs/010-media-attachments/spec.md](docs/specs/010-media-attachments/spec.md)）
+- [x] 濫用與審核控制（SDD-011：restart-persistent fixed-window rate limits 與 `429 RATE_LIMITED`、authenticated content reports、author/IP 最小化信號與 30/180/24h retention；見 [docs/specs/011-moderation-abuse-controls/spec.md](docs/specs/011-moderation-abuse-controls/spec.md)）
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）

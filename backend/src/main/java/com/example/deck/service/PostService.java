@@ -17,6 +17,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -31,18 +32,21 @@ public class PostService {
     private final ImageValidator imageValidator;
     private final MediaStorage mediaStorage;
     private final PostImagePersistenceService postImagePersistenceService;
+    private final AbuseSignalRecorder signalRecorder;
 
     public PostService(
             PostRepository postRepository,
             PostCursorCodec cursorCodec,
             ImageValidator imageValidator,
             MediaStorage mediaStorage,
-            PostImagePersistenceService postImagePersistenceService) {
+            PostImagePersistenceService postImagePersistenceService,
+            AbuseSignalRecorder signalRecorder) {
         this.postRepository = postRepository;
         this.cursorCodec = cursorCodec;
         this.imageValidator = imageValidator;
         this.mediaStorage = mediaStorage;
         this.postImagePersistenceService = postImagePersistenceService;
+        this.signalRecorder = signalRecorder;
     }
 
     public PostPage getPosts(String channel, int limit, String before) {
@@ -107,9 +111,12 @@ public class PostService {
         return new PostPage(items, nextCursor);
     }
 
-    public Post createPost(long accountId, CreatePostRequest request) {
-        return postRepository.insertOwned(
+    @Transactional
+    public Post createPost(long accountId, CreatePostRequest request, String ipHmac) {
+        Post post = postRepository.insertOwned(
                 accountId, request.content().trim(), request.channel());
+        signalRecorder.recordPostCreated(accountId, post.id(), ipHmac);
+        return post;
     }
 
     /**
@@ -121,7 +128,10 @@ public class PostService {
      * primary failure.
      */
     public Post createPostWithImage(
-            long accountId, CreatePostRequest request, MultipartFile image) {
+            long accountId,
+            CreatePostRequest request,
+            MultipartFile image,
+            String ipHmac) {
         ValidatedImage validated = validateImage(image);
         String storageKey = mediaStorage.store(validated.bytes(), validated.extension());
         try {
@@ -130,7 +140,8 @@ public class PostService {
                     request.content().trim(),
                     request.channel(),
                     storageKey,
-                    validated);
+                    validated,
+                    ipHmac);
         } catch (RuntimeException failure) {
             compensate(storageKey, failure);
             throw failure;

@@ -21,16 +21,19 @@ public class ReplyService {
     private final ReplyRepository replyRepository;
     private final PostCursorCodec cursorCodec;
     private final NotificationRepository notificationRepository;
+    private final AbuseSignalRecorder signalRecorder;
 
     public ReplyService(
             PostRepository postRepository,
             ReplyRepository replyRepository,
             PostCursorCodec cursorCodec,
-            NotificationRepository notificationRepository) {
+            NotificationRepository notificationRepository,
+            AbuseSignalRecorder signalRecorder) {
         this.postRepository = postRepository;
         this.replyRepository = replyRepository;
         this.cursorCodec = cursorCodec;
         this.notificationRepository = notificationRepository;
+        this.signalRecorder = signalRecorder;
     }
 
     public ReplyPage getReplies(long postId, int limit, String after) {
@@ -59,10 +62,15 @@ public class ReplyService {
     }
 
     @Transactional
-    public Reply createReply(long postId, long accountId, CreateReplyRequest request) {
+    public Reply createReply(
+            long postId,
+            long accountId,
+            CreateReplyRequest request,
+            String ipHmac) {
         validatePost(postId);
         Reply reply = replyRepository.insertOwned(postId, accountId, request.content().trim());
         emitReplyNotification(postId, accountId, reply);
+        signalRecorder.recordReplyCreated(accountId, reply.id(), ipHmac);
         return reply;
     }
 

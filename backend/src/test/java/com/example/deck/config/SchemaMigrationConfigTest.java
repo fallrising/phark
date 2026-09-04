@@ -355,11 +355,11 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void emptyDatabaseBootstrapsV1ThroughV9() throws Exception {
+    void emptyDatabaseBootstrapsV1ThroughV10() throws Exception {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(0)).containsExactly("1", "SQL", "V1__create_legacy_posts.sql", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
@@ -375,9 +375,12 @@ class SchemaMigrationConfigTest {
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(history.get(8))
                 .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
 
         assertV8SearchSchema();
         assertV9PostImagesSchema();
+        assertV10ModerationSchema();
 
         assertThat(tableExists("posts")).isTrue();
         assertThat(tableExists("replies")).isTrue();
@@ -388,6 +391,9 @@ class SchemaMigrationConfigTest {
         assertThat(tableExists("notification_read_state")).isTrue();
         assertThat(tableExists("post_images")).isTrue();
         assertThat(tableExists("flyway_schema_history")).isTrue();
+        assertThat(tableExists("abuse_rate_limit_buckets")).isTrue();
+        assertThat(tableExists("content_reports")).isTrue();
+        assertThat(tableExists("abuse_signals")).isTrue();
 
         assertThat(columnExists("accounts", "id")).isTrue();
         assertThat(columnExists("accounts", "handle")).isTrue();
@@ -477,6 +483,9 @@ class SchemaMigrationConfigTest {
         assertThat(queryLong("SELECT COUNT(*) FROM notifications")).isZero();
         assertThat(queryLong("SELECT COUNT(*) FROM notification_read_state")).isZero();
         assertThat(queryLong("SELECT COUNT(*) FROM post_images")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM abuse_rate_limit_buckets")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM content_reports")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM abuse_signals")).isZero();
 
         execute(
                 "INSERT INTO accounts (id, handle, display_name, password_hash) VALUES (1, 'bob', 'Bob', 'hash')",
@@ -520,7 +529,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
@@ -536,6 +545,8 @@ class SchemaMigrationConfigTest {
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(history.get(8))
                 .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
 
         assertV8SearchSchema();
 
@@ -587,7 +598,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(0)).containsExactly("1", "BASELINE", "<< Flyway Baseline >>", "1");
         assertThat(history.get(1)).containsExactly("2", "SQL", "V2__add_cursor_timeline_indexes.sql", "1");
         assertThat(history.get(2)).containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
@@ -603,6 +614,8 @@ class SchemaMigrationConfigTest {
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(history.get(8))
                 .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
 
         assertV8SearchSchema();
         assertThat(searchMatchCount("\"current\"")).isEqualTo(1);
@@ -657,7 +670,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v3DatabaseUpgradesToV9PreservingUnownedContentAndIds() throws Exception {
+    void v3DatabaseUpgradesToV10PreservingUnownedContentAndIds() throws Exception {
         runMigration("3");
         execute(
                 "INSERT INTO posts (id, author, content, channel, created_at) VALUES (41, 'Alice', 'v3 post', 'ops', '2024-03-01 05:07:08')",
@@ -666,7 +679,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(2))
                 .containsExactly("3", "SQL", "V3__add_post_replies.sql", "1");
         assertThat(history.get(3))
@@ -681,6 +694,8 @@ class SchemaMigrationConfigTest {
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(history.get(8))
                 .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
 
         assertV8SearchSchema();
         assertThat(searchMatchCount("\"v3\"")).isEqualTo(1);
@@ -705,7 +720,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v4DatabaseUpgradesToV9PreservingAccountsAndOwnedContent() throws Exception {
+    void v4DatabaseUpgradesToV10PreservingAccountsAndOwnedContent() throws Exception {
         runMigration("4");
         execute(
                 "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-03-04 05:06:07', '2024-03-04 05:06:07')",
@@ -715,7 +730,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(4))
                 .containsExactly("5", "SQL", "V5__add_post_likes.sql", "1");
         assertThat(history.get(5))
@@ -726,6 +741,8 @@ class SchemaMigrationConfigTest {
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(history.get(8))
                 .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
         assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id = 7 AND handle = 'alice'")).isEqualTo(1);
         assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 41 AND author_account_id = 7")).isEqualTo(1);
         assertThat(queryLong("SELECT COUNT(*) FROM replies WHERE id = 17 AND author_account_id = 7")).isEqualTo(1);
@@ -749,7 +766,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v5DatabaseUpgradesToV9PreservingAccountsPostsRepliesLikesAndIds() throws Exception {
+    void v5DatabaseUpgradesToV10PreservingAccountsPostsRepliesLikesAndIds() throws Exception {
         runMigration("5");
         execute(
                 "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-04-05 06:07:08', '2024-04-05 06:07:08')",
@@ -760,7 +777,7 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(5))
                 .containsExactly("6", "SQL", "V6__add_post_reposts.sql", "1");
         assertThat(history.get(6))
@@ -769,6 +786,8 @@ class SchemaMigrationConfigTest {
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(history.get(8))
                 .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
 
         assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id = 7 AND handle = 'alice'"))
                 .isEqualTo(1);
@@ -796,7 +815,7 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void v6DatabaseUpgradesToV9PreservingAccountsPostsRepliesLikesRepostsAndBackfill()
+    void v6DatabaseUpgradesToV10PreservingAccountsPostsRepliesLikesRepostsAndBackfill()
             throws Exception {
         runMigration("6");
         execute(
@@ -810,12 +829,14 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(6)).containsExactly("7", "SQL", "V7__add_notifications.sql", "1");
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(history.get(8))
                 .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
 
         assertV8SearchSchema();
 
@@ -883,11 +904,13 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(7))
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(history.get(8))
                 .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
 
         assertThat(queryLong("SELECT COUNT(*) FROM accounts WHERE id IN (7, 8)")).isEqualTo(2);
         assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id IN (41, 42, 43)")).isEqualTo(3);
@@ -972,23 +995,26 @@ class SchemaMigrationConfigTest {
     }
 
     @Test
-    void emptyV8DatabaseUpgradesToV9WithEmptyPostImages() throws Exception {
+    void emptyV8DatabaseUpgradesToV10WithEmptyPostImages() throws Exception {
         runMigration("8");
 
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(8))
                 .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
         assertV8SearchSchema();
         assertV9PostImagesSchema();
+        assertV10ModerationSchema();
         assertThat(queryLong("SELECT COUNT(*) FROM post_images")).isZero();
         assertThat(integrityCheck()).isEqualTo("ok");
     }
 
     @Test
-    void populatedV8DatabaseUpgradesToV9PreservingCountsIdsAndTimestamps() throws Exception {
+    void populatedV8DatabaseUpgradesToV10PreservingCountsIdsAndTimestamps() throws Exception {
         runMigration("8");
         execute(
                 "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-08-09 10:11:12', '2024-08-09 10:11:12')",
@@ -1003,9 +1029,11 @@ class SchemaMigrationConfigTest {
         runMigration();
 
         List<String[]> history = queryHistory();
-        assertThat(history).hasSize(9);
+        assertThat(history).hasSize(10);
         assertThat(history.get(7)).containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(history.get(8)).containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
 
         assertThat(queryLong("SELECT COUNT(*) FROM accounts")).isEqualTo(2);
         assertThat(queryLong("SELECT COUNT(*) FROM posts")).isEqualTo(2);
@@ -1140,6 +1168,257 @@ class SchemaMigrationConfigTest {
                 .containsExactly("8", "SQL", "V8__add_post_search.sql", "1");
         assertThat(schemaObjectSql("table", "post_images"))
                 .isEqualTo("CREATE TABLE post_images (id INTEGER PRIMARY KEY)");
+        assertThat(integrityCheck()).isEqualTo("ok");
+    }
+
+    private void assertV10ModerationSchema() throws Exception {
+        assertThat(tableExists("abuse_rate_limit_buckets")).isTrue();
+        assertThat(tableExists("content_reports")).isTrue();
+        assertThat(tableExists("abuse_signals")).isTrue();
+
+        assertThat(columnIsNullable("abuse_rate_limit_buckets", "scope")).isFalse();
+        assertThat(columnIsNullable("abuse_rate_limit_buckets", "subject_kind")).isFalse();
+        assertThat(columnIsNullable("abuse_rate_limit_buckets", "subject_hmac")).isFalse();
+        assertThat(columnIsNullable("abuse_rate_limit_buckets", "window_start_epoch")).isFalse();
+        assertThat(columnIsNullable("abuse_rate_limit_buckets", "window_end_epoch")).isFalse();
+        assertThat(columnIsNullable("abuse_rate_limit_buckets", "expires_at_epoch")).isFalse();
+        assertThat(columnIsNullable("abuse_rate_limit_buckets", "request_count")).isFalse();
+        assertThat(primaryKeyOrder("abuse_rate_limit_buckets", "scope")).isEqualTo(1);
+        assertThat(primaryKeyOrder("abuse_rate_limit_buckets", "subject_kind")).isEqualTo(2);
+        assertThat(primaryKeyOrder("abuse_rate_limit_buckets", "subject_hmac")).isEqualTo(3);
+        assertThat(primaryKeyOrder("abuse_rate_limit_buckets", "window_start_epoch")).isEqualTo(4);
+        assertThat(indexExists("idx_abuse_rate_limit_buckets_expiry")).isTrue();
+
+        assertThat(columnIsNullable("content_reports", "reporter_account_id")).isFalse();
+        assertThat(columnIsNullable("content_reports", "target_type")).isFalse();
+        assertThat(columnIsNullable("content_reports", "post_id")).isTrue();
+        assertThat(columnIsNullable("content_reports", "reply_id")).isTrue();
+        assertThat(columnIsNullable("content_reports", "reason")).isFalse();
+        assertThat(columnIsNullable("content_reports", "status")).isFalse();
+        assertThat(columnIsNullable("content_reports", "created_at")).isFalse();
+        assertThat(columnIsNullable("content_reports", "expires_at_epoch")).isFalse();
+        assertThat(primaryKeyOrder("content_reports", "id")).isEqualTo(1);
+        assertThat(indexExists("uq_content_reports_reporter_post")).isTrue();
+        assertThat(schemaObjectSql("index", "uq_content_reports_reporter_post"))
+                .contains("reporter_account_id")
+                .contains("post_id")
+                .contains("WHERE post_id IS NOT NULL");
+        assertThat(indexExists("uq_content_reports_reporter_reply")).isTrue();
+        assertThat(schemaObjectSql("index", "uq_content_reports_reporter_reply"))
+                .contains("reporter_account_id")
+                .contains("reply_id")
+                .contains("WHERE reply_id IS NOT NULL");
+        assertThat(indexExists("idx_content_reports_expiry")).isTrue();
+        assertThat(fkExists("content_reports", "reporter_account_id", "accounts", "CASCADE")).isTrue();
+        assertThat(fkExists("content_reports", "post_id", "posts", "CASCADE")).isTrue();
+        assertThat(fkExists("content_reports", "reply_id", "replies", "CASCADE")).isTrue();
+
+        assertThat(columnIsNullable("abuse_signals", "action_kind")).isFalse();
+        assertThat(columnIsNullable("abuse_signals", "actor_account_id")).isFalse();
+        assertThat(columnIsNullable("abuse_signals", "post_id")).isTrue();
+        assertThat(columnIsNullable("abuse_signals", "reply_id")).isTrue();
+        assertThat(columnIsNullable("abuse_signals", "report_id")).isTrue();
+        assertThat(columnIsNullable("abuse_signals", "ip_hmac")).isFalse();
+        assertThat(columnIsNullable("abuse_signals", "created_at")).isFalse();
+        assertThat(columnIsNullable("abuse_signals", "expires_at_epoch")).isFalse();
+        assertThat(primaryKeyOrder("abuse_signals", "id")).isEqualTo(1);
+        assertThat(indexExists("uq_abuse_signals_post")).isTrue();
+        assertThat(schemaObjectSql("index", "uq_abuse_signals_post"))
+                .contains("post_id")
+                .contains("WHERE post_id IS NOT NULL");
+        assertThat(indexExists("uq_abuse_signals_reply")).isTrue();
+        assertThat(schemaObjectSql("index", "uq_abuse_signals_reply"))
+                .contains("reply_id")
+                .contains("WHERE reply_id IS NOT NULL");
+        assertThat(indexExists("uq_abuse_signals_report")).isTrue();
+        assertThat(schemaObjectSql("index", "uq_abuse_signals_report"))
+                .contains("report_id")
+                .contains("WHERE report_id IS NOT NULL");
+        assertThat(indexExists("idx_abuse_signals_ip_time")).isTrue();
+        assertThat(indexExists("idx_abuse_signals_actor_time")).isTrue();
+        assertThat(indexExists("idx_abuse_signals_expiry")).isTrue();
+        assertThat(fkExists("abuse_signals", "actor_account_id", "accounts", "CASCADE")).isTrue();
+        assertThat(fkExists("abuse_signals", "post_id", "posts", "CASCADE")).isTrue();
+        assertThat(fkExists("abuse_signals", "reply_id", "replies", "CASCADE")).isTrue();
+        assertThat(fkExists("abuse_signals", "report_id", "content_reports", "CASCADE")).isTrue();
+
+        assertThat(integrityCheck()).isEqualTo("ok");
+    }
+
+    @Test
+    void v10ModerationConstraintsRejectInvalidRowsWithoutDeletingParentContent() throws Exception {
+        runMigration();
+        execute(
+                "INSERT INTO accounts (id, handle, display_name, password_hash) VALUES (1, 'alice', 'Alice', 'hash')",
+                "INSERT INTO accounts (id, handle, display_name, password_hash) VALUES (2, 'bob', 'Bob', 'hash')",
+                "INSERT INTO posts (id, author, content, channel, author_account_id) VALUES (10, 'Alice', 'post', 'home', 1)",
+                "INSERT INTO posts (id, author, content, channel, author_account_id) VALUES (11, 'Bob', 'post', 'tech', 2)",
+                "INSERT INTO replies (id, post_id, author, content, author_account_id) VALUES (20, 10, 'Bob', 'reply', 2)");
+
+        String hmac = SHA256;
+        String bucket =
+                "INSERT INTO abuse_rate_limit_buckets (scope, subject_kind, subject_hmac, window_start_epoch, window_end_epoch, expires_at_epoch, request_count) VALUES ('%s', '%s', '%s', %d, %d, %d, %d)";
+        execute(bucket.formatted("CONTENT_WRITE", "ACCOUNT", hmac, 1000, 1060, 87460, 3));
+        assertSqlRejected(bucket.formatted("NOPE", "ACCOUNT", hmac, 2000, 2060, 88460, 1));
+        assertSqlRejected(bucket.formatted("CONTENT_WRITE", "OTHER", hmac, 2000, 2060, 88460, 1));
+        assertSqlRejected(bucket.formatted("CONTENT_WRITE", "ACCOUNT", hmac.toUpperCase(), 2000, 2060, 88460, 1));
+        assertSqlRejected(bucket.formatted("CONTENT_WRITE", "ACCOUNT", "z".repeat(64), 2000, 2060, 88460, 1));
+        assertSqlRejected(bucket.formatted("CONTENT_WRITE", "ACCOUNT", "abc", 2000, 2060, 88460, 1));
+        assertSqlRejected(bucket.formatted("CONTENT_WRITE", "ACCOUNT", hmac, 2000, 2060, 88460, 0));
+        assertSqlRejected(bucket.formatted("CONTENT_WRITE", "ACCOUNT", hmac, 2000, 2060, 88460, -1));
+        assertSqlRejected(bucket.formatted("CONTENT_WRITE", "ACCOUNT", hmac, 2000, 2000, 88460, 1));
+        assertSqlRejected(bucket.formatted("CONTENT_WRITE", "ACCOUNT", hmac, 2000, 2060, 88459, 1));
+        assertSqlRejected(bucket.formatted("CONTENT_WRITE", "ACCOUNT", hmac, 1000, 1060, 87460, 1));
+        assertSqlRejected(bucket.formatted("REGISTER", "ACCOUNT", hmac, 2000, 2060, 88460, 1));
+        assertSqlRejected(bucket.formatted("LOGIN", "ACCOUNT", hmac, 2000, 2060, 88460, 1));
+
+        String report =
+                "INSERT INTO content_reports (reporter_account_id, target_type, post_id, reply_id, reason, status, expires_at_epoch) VALUES (%d, '%s', %s, %s, '%s', 'RECEIVED', %d)";
+        execute(
+                report.formatted(1, "POST", "10", "NULL", "SPAM", 1800000),
+                report.formatted(2, "REPLY", "NULL", "20", "HARASSMENT", 1800000));
+        assertSqlRejected(report.formatted(1, "POST", "10", "NULL", "SPAM", 1800000));
+        assertSqlRejected(report.formatted(2, "REPLY", "NULL", "20", "SPAM", 1800000));
+        assertSqlRejected(report.formatted(1, "POST", "NULL", "20", "SPAM", 1800000));
+        assertSqlRejected(report.formatted(1, "POST", "NULL", "NULL", "SPAM", 1800000));
+        assertSqlRejected(report.formatted(1, "REPLY", "10", "NULL", "SPAM", 1800000));
+        assertSqlRejected(report.formatted(1, "POST", "10", "20", "SPAM", 1800000));
+        assertSqlRejected(report.formatted(1, "POST", "10", "NULL", "UNKNOWN", 1800000));
+        assertSqlRejected(
+                "INSERT INTO content_reports (reporter_account_id, target_type, post_id, reason, status, expires_at_epoch) VALUES (2, 'POST', 11, 'SPAM', 'ACTIONED', 1800000)");
+        assertThatThrownBy(() -> execute(
+                        "PRAGMA foreign_keys = ON",
+                        report.formatted(1, "POST", "999", "NULL", "SPAM", 1800000)))
+                .isInstanceOf(SQLException.class);
+        assertThatThrownBy(() -> execute(
+                        "PRAGMA foreign_keys = ON",
+                        report.formatted(999, "POST", "10", "NULL", "SPAM", 1800000)))
+                .isInstanceOf(SQLException.class);
+        execute(
+                report.formatted(2, "POST", "10", "NULL", "SPAM", 1800000),
+                report.formatted(1, "POST", "11", "NULL", "SPAM", 1800000));
+        assertThat(queryLong("SELECT COUNT(*) FROM content_reports")).isEqualTo(4);
+
+        String signal =
+                "INSERT INTO abuse_signals (action_kind, actor_account_id, post_id, reply_id, report_id, ip_hmac, expires_at_epoch) VALUES ('%s', %s, %s, %s, %s, '%s', %d)";
+        execute(
+                signal.formatted("POST_CREATED", "1", "10", "NULL", "NULL", hmac, 1000000),
+                signal.formatted("REPLY_CREATED", "2", "NULL", "20", "NULL", hmac, 1000000),
+                signal.formatted("REPORT_CREATED", "1", "NULL", "NULL", "1", hmac, 1000000));
+        assertSqlRejected(signal.formatted("SIGNUP", "1", "NULL", "NULL", "NULL", hmac, 1000000));
+        assertSqlRejected(signal.formatted("POST_CREATED", "NULL", "11", "NULL", "NULL", hmac, 1000000));
+        assertSqlRejected(signal.formatted("POST_CREATED", "1", "NULL", "20", "NULL", hmac, 1000000));
+        assertSqlRejected(signal.formatted("POST_CREATED", "1", "10", "NULL", "1", hmac, 1000000));
+        assertSqlRejected(signal.formatted("REPLY_CREATED", "1", "10", "20", "NULL", hmac, 1000000));
+        assertSqlRejected(signal.formatted("POST_CREATED", "1", "10", "NULL", "NULL", hmac.toUpperCase(), 1000000));
+        assertSqlRejected(signal.formatted("POST_CREATED", "1", "10", "NULL", "NULL", "z".repeat(64), 1000000));
+        assertSqlRejected(signal.formatted("POST_CREATED", "1", "10", "NULL", "NULL", "abc", 1000000));
+        assertThatThrownBy(() -> execute(
+                        "PRAGMA foreign_keys = ON",
+                        signal.formatted("POST_CREATED", "999", "11", "NULL", "NULL", hmac, 1000000)))
+                .isInstanceOf(SQLException.class);
+        assertThat(queryLong("SELECT COUNT(*) FROM abuse_signals")).isEqualTo(3);
+
+        execute("PRAGMA foreign_keys = ON", "DELETE FROM content_reports WHERE id = 1");
+        assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 10")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM accounts")).isEqualTo(2);
+        assertThat(queryLong("SELECT COUNT(*) FROM content_reports")).isEqualTo(3);
+        assertThat(queryLong("SELECT COUNT(*) FROM abuse_signals")).isEqualTo(2);
+
+        execute("PRAGMA foreign_keys = ON", "DELETE FROM posts WHERE id = 10");
+        assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 11")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM replies")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM content_reports")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM abuse_signals")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM accounts")).isEqualTo(2);
+
+        execute("PRAGMA foreign_keys = ON", "DELETE FROM accounts WHERE id = 1");
+        assertThat(queryLong("SELECT COUNT(*) FROM accounts")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM content_reports")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM posts WHERE id = 11")).isEqualTo(1);
+        assertThat(integrityCheck()).isEqualTo("ok");
+    }
+
+    @Test
+    void populatedV9DatabaseUpgradesToV10PreservingCountsIdsAndMetadata() throws Exception {
+        runMigration("9");
+        execute(
+                "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (7, 'alice', 'Alice', 'hash', 'bio', '2024-08-09 10:11:12', '2024-08-09 10:11:12')",
+                "INSERT INTO accounts (id, handle, display_name, password_hash, bio, created_at, updated_at) VALUES (8, 'bob', 'Bob', 'hash', 'bio', '2024-08-09 10:11:12', '2024-08-09 10:11:12')",
+                "INSERT INTO posts (id, author, content, channel, created_at, author_account_id) VALUES (41, 'Alice', 'alpha bolt', 'tech', '2024-08-09 10:12:13', 7)",
+                "INSERT INTO posts (id, author, content, channel, created_at, author_account_id) VALUES (42, 'Bob', 'yellow volt', 'home', '2024-08-09 10:13:14', 8)",
+                "INSERT INTO replies (id, post_id, author, content, created_at, author_account_id) VALUES (17, 41, 'Bob', 'a reply', '2024-08-09 10:14:15', 8)",
+                "INSERT INTO post_likes (post_id, account_id, created_at) VALUES (41, 8, '2024-08-09 10:15:16')",
+                "INSERT INTO post_reposts (post_id, account_id, created_at) VALUES (41, 8, '2024-08-09 10:16:17')",
+                "INSERT INTO notifications (recipient_account_id, actor_account_id, post_id, type) VALUES (7, 8, 41, 'LIKE')",
+                "INSERT INTO post_images (post_id, storage_key, content_type, byte_size, width, height, sha256) VALUES (41, 'abc-123', 'image/jpeg', 2048, 64, 64, '"
+                        + SHA256 + "')");
+
+        runMigration();
+
+        List<String[]> history = queryHistory();
+        assertThat(history).hasSize(10);
+        assertThat(history.get(8)).containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(history.get(9))
+                .containsExactly("10", "SQL", "V10__add_moderation_controls.sql", "1");
+
+        assertThat(queryLong("SELECT COUNT(*) FROM accounts")).isEqualTo(2);
+        assertThat(queryLong("SELECT COUNT(*) FROM posts")).isEqualTo(2);
+        assertThat(queryLong("SELECT COUNT(*) FROM replies")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM post_likes")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM post_reposts")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM notifications")).isEqualTo(1);
+        assertThat(queryLong("SELECT COUNT(*) FROM post_images")).isEqualTo(1);
+
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM accounts WHERE id = 7 AND created_at = '2024-08-09 10:11:12' AND updated_at = '2024-08-09 10:11:12'"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM posts WHERE id = 41 AND content = 'alpha bolt' AND created_at = '2024-08-09 10:12:13' AND author_account_id = 7"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM replies WHERE id = 17 AND content = 'a reply' AND created_at = '2024-08-09 10:14:15' AND author_account_id = 8"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM post_likes WHERE post_id = 41 AND account_id = 8 AND created_at = '2024-08-09 10:15:16'"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM post_reposts WHERE post_id = 41 AND account_id = 8 AND created_at = '2024-08-09 10:16:17'"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM notifications WHERE recipient_account_id = 7 AND actor_account_id = 8 AND post_id = 41 AND type = 'LIKE'"))
+                .isEqualTo(1);
+        assertThat(queryLong(
+                        "SELECT COUNT(*) FROM post_images WHERE post_id = 41 AND storage_key = 'abc-123' AND content_type = 'image/jpeg' AND byte_size = 2048 AND width = 64 AND height = 64 AND sha256 = '"
+                                + SHA256 + "'"))
+                .isEqualTo(1);
+
+        assertV8SearchSchema();
+        assertV10ModerationSchema();
+        assertThat(searchRowIds("\"bolt\"")).containsExactly(41L);
+        assertThat(searchRowIds("\"volt\"")).containsExactly(42L);
+        assertThat(queryLong("SELECT COUNT(*) FROM search_posts")).isEqualTo(2);
+
+        assertThat(queryLong("SELECT COUNT(*) FROM abuse_rate_limit_buckets")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM content_reports")).isZero();
+        assertThat(queryLong("SELECT COUNT(*) FROM abuse_signals")).isZero();
+        assertThat(integrityCheck()).isEqualTo("ok");
+    }
+
+    @Test
+    void failedV10MigrationDoesNotLeavePartialModerationSchemaOrHistory() throws Exception {
+        runMigration("9");
+        execute("CREATE TABLE abuse_rate_limit_buckets (id INTEGER PRIMARY KEY)");
+
+        assertThatThrownBy(this::runMigration).isInstanceOf(FlywayException.class);
+
+        assertThat(queryHistory()).hasSize(9);
+        assertThat(queryHistory().get(8))
+                .containsExactly("9", "SQL", "V9__add_post_images.sql", "1");
+        assertThat(schemaObjectSql("table", "abuse_rate_limit_buckets"))
+                .isEqualTo("CREATE TABLE abuse_rate_limit_buckets (id INTEGER PRIMARY KEY)");
+        assertThat(schemaObjectExists("table", "content_reports")).isFalse();
+        assertThat(schemaObjectExists("table", "abuse_signals")).isFalse();
         assertThat(integrityCheck()).isEqualTo("ok");
     }
 

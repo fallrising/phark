@@ -5,6 +5,7 @@ import { AuthorLink } from "@/components/AuthorLink"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ReplyThread } from "@/components/ReplyThread"
+import { ReportControl } from "@/components/ReportControl"
 import type { Post, PostImage } from "@/types/post"
 
 interface PostCardProps {
@@ -150,6 +151,12 @@ export function PostCard({
             </p>
           ) : null}
         </div>
+        <ReportControl
+          targetType="POST"
+          targetId={post.id}
+          sessionAccount={sessionAccount}
+          onAuthRequest={onAuthRequest}
+        />
         <ReplyThread
           postId={post.id}
           replyCount={post.replyCount}

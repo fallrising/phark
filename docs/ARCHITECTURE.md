@@ -1,6 +1,6 @@
 # 架構與技術決策
 
-> 最後更新：2026-09-03
+> 最後更新：2026-09-04
 
 本專案目標是在**閒置 VPS** 上建立一條**單機、可重現、可回滾**的部署路徑，**不碰 Kubernetes**。
 
@@ -294,6 +294,47 @@ orphan reconciliation 是 stopped-app 的 runbook，DB 層不負責刪檔。完�
 [docs/MIGRATIONS.md](MIGRATIONS.md) 的 media snapshot/restore/reconciliation 與
 [docs/DEPLOYMENT.md](DEPLOYMENT.md) 的步驟 5/6；本節只記錄決策與 boundary，不重複
 runbook 內容。
+
+### V10（SDD-011 moderation and abuse controls）：buckets、reports、signals
+
+V10 新增三張 **internal-only** 資料表：`abuse_rate_limit_buckets`（restart-persistent
+fixed-window 計數器）、`content_reports`（authenticated 檢舉）與 `abuse_signals`
+（minimized author/IP 來源信號）。三者都以明確 FK/`ON DELETE`/CHECK/partial-unique/
+expiry index 約束，只會 cascade 刪除 moderation rows，**任何 moderation table 都不能
+cascade 進 accounts、posts、replies、interactions、notifications 或 media**。V10
+**不做 backfill**：legacy content 的歷史 IP origin 未知，不留假信號，仍可被檢舉。
+完整 schema 與操作程序見 [docs/MIGRATIONS.md](MIGRATIONS.md) 的 V10 段落。
+
+**Request-rate boundary**：MVC interceptor 在 Spring Security 之後、controller 之前，
+依 exact method/path 對應 policy set，在**單一 SQLite transaction** 內以
+account-then-IP 順序條件式 upsert 保留 quota。Counter key 是
+`(scope, subject_kind, subject_hmac, window_start_epoch)`；window 是 UTC
+epoch-aligned fixed window，bucket 在 window end 後 24 小時到期。deployment 維持
+單一 writer，rate-limit state 從 SQLite 讀寫，因此 **restart 後 quota 仍在**。
+
+**網路 identity boundary**：raw IP 永不持久化、永不進 log、永不回傳。Account subject
+以 `HMAC-SHA-256(secret, "phark-account-v1:" + accountId)` 產生；IP subject 是
+domain-separated HMAC-SHA-256——先處理成 canonical network bytes（strict four-octet
+IPv4；IPv4-mapped IPv6 正規化為 IPv4；native IPv6 只 hash 前 8 bytes、即 /64
+partition；拒絕 whitespace/zone/hostname/DNS lookup），HMAC 輸出是 lowercase
+64-hex。Production 需要 `APP_ABUSE_IP_HMAC_SECRET`（unpadded base64url、decode 後
+恰 32 bytes）；prod startup 拒絕 missing/malformed/short/dev 值。**Rotation 有意的
+重設有效 partition 並斷開新舊 HMAC 關聯**，舊 rows 依 retention 自然老化（無
+dual-key rotation）。
+
+**Trust boundary**：只有 Traefik publish 80/443，app port 不 publish。Prod 才有
+`server.forward-headers-strategy=framework`，且只限於收到 Traefik 淨化後的流量
+（Traefik `forwardedHeaders.insecure=false` 於 web/websecure、JSON access log drop
+`ClientAddr`/`ClientHost`/`ClientPort`、全部 request headers 與 query parameters）。
+任何在共享 `proxy` network 上的 container 都在 trusted infrastructure boundary
+內；直接 publish port 的本機 smoke 要顯式 `SERVER_FORWARD_HEADERS_STRATEGY=none`。
+
+**Retention**：signals 30 天、reports 180 天、rate-limit buckets 於 window end + 24
+小時；cleanup 在 startup 與每天 03:00 UTC（cron `0 0 3 * * *` zone UTC）執行，
+idempotent，create-time 也會先清該 reporter/target 的過期 rows。新增 quota/report/
+signal/429 的 header 與 RFC 9457 契約見 [docs/DEVELOPMENT.md](DEVELOPMENT.md)；
+執行面向的 secret/backup/rollback/smoke 見 [docs/DEPLOYMENT.md](DEPLOYMENT.md) 與
+[MIGRATIONS.md](MIGRATIONS.md)。
 
 HTTP session 是單 instance process memory，idle timeout 預設 30 分鐘；restart 或
 重新部署會登出所有使用者。這與 SQLite 的 replicas=1 限制一致，但不是 durable

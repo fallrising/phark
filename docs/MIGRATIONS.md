@@ -1,7 +1,7 @@
 # Schema Migration Production Runbook
 
 > 適用於 deck 應用（`deck` Compose project），基於 Flyway + SQLite。
-> 最後更新：2026-09-03
+> 最後更新：2026-09-04
 
 ---
 
@@ -250,7 +250,8 @@ SDD-007 release 的預期 latest version 是 V6 `add post reposts`。SDD-008
 （notifications）release 的預期 latest version 是 V7 `add notifications`，兩張新
 table 都不回填既有資料。SDD-009（search）release 的預期 latest version 是 V8
 `add post search`。**SDD-010（media attachments）release 的預期 latest version
-是 V9 `add post images`——V9 是目前最新 migration**。V4 新增
+是 V9 `add post images`——V9 是該 release 的最新 migration；**目前的
+最新 migration 是 V10 `add moderation controls`（SDD-011，見下方 V10 段落）**。V4 新增
 `accounts`、nullable `posts.author_account_id`、nullable
 `replies.author_account_id` 與對應 indexes。升級 V3 或 legacy baseline 時不得依
 `author` 字串建立 account；所有既有 ownership 必須保持 `NULL`，既有 row、ID、
@@ -349,6 +350,60 @@ sudo sqlite3 /opt/apps/deck/data/deck.db \
 sudo sqlite3 /opt/apps/deck/data/deck.db \
   "SELECT COUNT(*) FROM posts;"
 # 預期: >= 0 且與升級前 count 一致（populated V8→V9 保留既有資料）
+
+sudo sqlite3 /opt/apps/deck/data/deck.db "PRAGMA integrity_check;"
+# 預期: ok
+```
+
+V10 是 SDD-011（moderation and abuse controls）的 migration，新增三張 internal-only
+table：`abuse_rate_limit_buckets`（restart-persistent fixed-window 計數器：composite
+PK `(scope, subject_kind, subject_hmac, window_start_epoch)`、CHECK 的
+scope/subject_kind 辭彙、`subject_hmac` lowercase 64-hex、`request_count > 0`、
+`window_end > window_start`、`expires_at = window_end + 86400`、REGISTER/LOGIN 只限
+IP）、`content_reports`（reporter account FK、`target_type` POST/REPLY、exactly one
+nullable post/reply FK、reason CHECK、status 只有 `RECEIVED`、created/expiry）與
+`abuse_signals`（非 null actor FK、依 action_kind CHECK 恰有一個 post/reply/report
+FK、`ip_hmac` lowercase 64-hex、created/expiry），外加 expiry retention indexes、
+partial unique indexes（每 reporter 每 post / 每 reporter 每 reply 至多一筆 retained
+report；每新 post/reply/report 至多一筆 origin/intake signal）與 IP/actor 時間
+index。V10 **完全 additive、不回填**：legacy post/reply 的歷史 IP origin 未知，
+刻意不製造假信號，legacy content 仍可被檢舉。**clean V1→V10 與 populated V9→V10
+（含非空 `post_images`）都是釋出前必需證據**；既有 accounts、posts、replies、likes、
+reposts、notifications、search_posts（FTS）、`post_images` rows 與 `/data/media`
+bytes 逐項保留。所有 FK 與 `ON DELETE` 都明確；dependent moderation rows
+（reports/signals）使用 `ON DELETE CASCADE`，rate bucket 無 FK；**任何 moderation
+table 都不會 cascade 刪除 accounts、posts、replies、interactions、notifications 或
+media**。V10 失敗必須留下 V9 history 與既有物件 intact（fail-closed）。Rollback 仍是
+backup restore（下方「步驟 5」）：還原 pre-V10 的 DB + media snapshot 與舊 Docker
+image；舊 image 搭配已 migrate 的 V10 schema 是不支援組合。V10 與 V1–V9 一律 immutable：
+不編輯已發布 migration、不手動 DELETE flyway_schema_history rows、不執行
+`flyway repair`/`flyway clean`。
+
+V10 部署後檢查（應用已健康、無進行中寫入）：
+
+```bash
+# latest history row 必須是 V10，且 success = 1
+sudo sqlite3 /opt/apps/deck/data/deck.db \
+  "SELECT version, description, success FROM flyway_schema_history
+   ORDER BY installed_rank DESC LIMIT 1;"
+# 預期: 10|add moderation controls|1
+
+# 三張新 table 存在（V10 不回填；部署當下皆空表）
+sudo sqlite3 /opt/apps/deck/data/deck.db \
+  "SELECT type, name FROM sqlite_master
+   WHERE type = 'table'
+     AND name IN ('abuse_rate_limit_buckets','content_reports','abuse_signals');"
+# 預期: table|abuse_rate_limit_buckets / table|content_reports / table|abuse_signals
+
+sudo sqlite3 /opt/apps/deck/data/deck.db \
+  "SELECT (SELECT COUNT(*) FROM abuse_rate_limit_buckets)
+       || '|' || (SELECT COUNT(*) FROM content_reports)
+       || '|' || (SELECT COUNT(*) FROM abuse_signals);"
+# 預期: 0|0|0（部署後才開始累積 quota/report/signal 資料）
+
+sudo sqlite3 /opt/apps/deck/data/deck.db \
+  "SELECT COUNT(*) FROM posts;"
+# 預期: >= 0 且與升級前 count 一致（populated V9→V10 保留既有資料）
 
 sudo sqlite3 /opt/apps/deck/data/deck.db "PRAGMA integrity_check;"
 # 預期: ok

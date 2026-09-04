@@ -1,6 +1,6 @@
 # VPS 部署指南
 
-> 最後更新：2026-09-03
+> 最後更新：2026-09-04
 
 本指南描述如何將 **Stream Deck**（repository：`fallrising/phark`）部署到單台 Ubuntu VPS，實現可重現、可回滾的 CI/CD 流程。
 
@@ -167,6 +167,7 @@ phark/
 ```bash
 docker build --progress=plain -t deck:local .
 
+TEST_SECRET=$(openssl rand -base64 32 | tr -d '=\n' | tr '+/' '-_')
 mkdir -p .local-data
 # Linux permission denied 時：
 # sudo chown -R 10001:10001 .local-data
@@ -178,6 +179,8 @@ docker run --rm \
   -e APP_MEDIA_PATH=/data/media \
   -e SPRING_PROFILES_ACTIVE=prod \
   -e SESSION_COOKIE_SECURE=false \
+  -e SERVER_FORWARD_HEADERS_STRATEGY=none \
+  -e APP_ABUSE_IP_HMAC_SECRET="${TEST_SECRET}" \
   -v "$(pwd)/.local-data:/data" \
   deck:local
 ```
@@ -220,6 +223,45 @@ Image bytes 與 SQLite 都落在單一 `.local-data`（container 內為 `/data`�
 posts**；session 儲存在 application memory，因此 restart 會登出既有使用者——這是
 單 instance 架構的已知限制（見步驟 6）。
 
+### SDD-011 濫用控制 smoke（本機與 VPS 通用）
+
+> **本文件同步任務只改文件/模板，未執行任何部署或 smoke**；下列步驟是含 V10
+> migration 的 release 上線前，由 operator 在本 image 上的驗收清單。
+> 直接 publish 8080 的 smoke 必須顯式 `SERVER_FORWARD_HEADERS_STRATEGY=none`
+> （避免信賴可被偽造的 forwarding headers）；上線經 Traefik 時由 prod profile
+> 的 `framework` 處理、且 app port 不 publish。
+
+使用步驟 5 已啟動的 disposable local container 與其 `TEST_SECRET` 執行下列檢查；
+production secret 必須另行生成並保密。
+
+- **Allowed / boundary / recovery**：quota 內 request 正常接受並回傳
+  `RateLimit-Limit`/`RateLimit-Remaining`/`RateLimit-Reset`；耗盡後下一 request 回
+  `429 RATE_LIMITED` 且 `Retry-After` = `RateLimit-Reset`；aligned window 過後
+  quota 恢復。Security（401/403）response **不帶** rate-limit header。
+- **Reports（valid / duplicate / invalid）**：authenticated + CSRF 對既有
+  post/reply 送一個 supported reason 得 `201`（回傳含 `RECEIVED`）；同 account 對
+  同 target 再送任一 reason 得 `409 DUPLICATE_REPORT`；non-positive ID、missing
+  target、unsupported/missing reason 各得對應的 400/404 RFC 9457
+  (`INVALID_POST_ID`/`INVALID_REPLY_ID`、`POST_NOT_FOUND`/`REPLY_NOT_FOUND`、
+  `VALIDATION_FAILED`)；這些 controller-level 4xx 不寫 report/signal，但通過
+  auth/CSRF 後仍會消耗一單位 `REPORT_WRITE` quota。只有 401/403 不寫 bucket。
+- **Redaction**：SQLite moderation rows 應只含 keyed HMAC、不可含 raw IP；response
+  body 與 `docker logs deck-local` 搜尋已知 raw IP 或 internal HMAC 必須 **0 matches**。
+- **Retention**：在 disposable DB 建立符合 V10 CHECK/FK 的 expired 與 live fixtures
+  後 restart；startup cleanup 應只刪除 expired rows；daily cleanup 由 `ModerationRetentionScheduler`
+  於 **03:00 UTC**（cron `0 0 3 * * *`，zone UTC）執行。
+- **Restart persistence**：消耗部分 quota 後 `docker restart deck-local`（同一
+  volume + 同一 secret），consumed quota 在 window 結束前仍有效；SQLite 資料與
+  `/data/media` bytes 不變。
+
+> **Trust boundary**：本方案只有 Traefik publish 80/443，app port 永不被 compose
+> publish；只有 Traefik 產生的 canonical client 值才會被 prod 的 forwarded-header
+> handling 信賴。任何能直接連到 app 的 peer 都必須在共享 `proxy` network 的
+> **trusted infrastructure boundary** 內。Traefik 模板
+> （`deploy/templates/edge/compose.yml`）已設定 `forwardedHeaders.insecure=false`
+> 於 web/websecure、JSON access log，並 drop `ClientAddr`/`ClientHost`/`ClientPort`、
+> 全部 request headers 與 query parameters。
+
 ---
 
 ## 步驟 6：VPS 應用 Compose
@@ -232,9 +274,25 @@ posts**；session 儲存在 application memory，因此 restart 會登出既有�
 cat > /opt/apps/deck/.env <<'EOF'
 APP_DOMAIN=deck.example.com
 APP_IMAGE=ghcr.io/fallrising/phark:sha-0000000000000000000000000000000000000000
+APP_ABUSE_IP_HMAC_SECRET=replace-me-with-a-32-byte-unpadded-base64url-value
 EOF
 chmod 600 /opt/apps/deck/.env
 ```
+
+`APP_ABUSE_IP_HMAC_SECRET`（SDD-011）在 production **必須**是**恰 32 bytes** 的
+random **unpadded base64url** 值，且不可沿用 repository 的 dev 值或任何已提交值；
+generation：
+
+```bash
+openssl rand -base64 32 | tr -d '=\n' | tr '+/' '-_'
+```
+
+缺少/malformed/short/dev 值會讓 prod profile **startup 失敗**（fail-closed）。
+此 secret 是 domain-separated internal abuse signals / rate-limit subjects 的 HMAC
+key：**rotation 有意的後果**是舊 HMAC 無法關聯、effective partition 重設、
+舊 rows 依 retention 自然老化。Compose 模板以
+`${APP_ABUSE_IP_HMAC_SECRET:?...}` 語法**要求**這個變數，`docker compose config`
+在缺值時直接報錯。secret 不得進 source control 或 log。
 
 設定 SQLite 目錄權限：
 

@@ -11,6 +11,7 @@ services:
       SERVER_PORT: "8080"
       APP_DB_PATH: "/data/deck.db"
       APP_MEDIA_PATH: "/data/media"
+      APP_ABUSE_IP_HMAC_SECRET: "${APP_ABUSE_IP_HMAC_SECRET:?APP_ABUSE_IP_HMAC_SECRET is required: set a distinct random 32-byte unpadded base64url value; see deploy/templates/deck/.env.example}"
       SPRING_PROFILES_ACTIVE: "prod"
       JAVA_TOOL_OPTIONS: >-
         -XX:MaxRAMPercentage=75

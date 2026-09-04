@@ -93,6 +93,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout", "/api/posts",
                                 "/api/posts/*/replies")
                         .authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/posts/*/reports",
+                                "/api/replies/*/reports")
+                        .authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/posts/*/like").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/posts/*/like").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/posts/*/repost").authenticated()

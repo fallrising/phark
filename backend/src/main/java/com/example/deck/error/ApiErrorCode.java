@@ -20,6 +20,8 @@ public enum ApiErrorCode {
             "Invalid image", "The uploaded file is not a valid JPEG or PNG image."),
     INVALID_POST_ID("urn:phark:problem:invalid-post-id", HttpStatus.BAD_REQUEST,
             "Invalid post ID", "Post ID must be a positive integer."),
+    INVALID_REPLY_ID("urn:phark:problem:invalid-reply-id", HttpStatus.BAD_REQUEST,
+            "Invalid reply ID", "Reply ID must be a positive integer."),
     INVALID_MEDIA_ID("urn:phark:problem:invalid-media-id", HttpStatus.BAD_REQUEST,
             "Invalid media ID", "Media ID must be a positive integer."),
     MALFORMED_REQUEST("urn:phark:problem:malformed-request", HttpStatus.BAD_REQUEST,
@@ -40,6 +42,10 @@ public enum ApiErrorCode {
             "Profile not found", "The requested profile does not exist."),
     POST_NOT_FOUND("urn:phark:problem:post-not-found", HttpStatus.NOT_FOUND,
             "Post not found", "The requested post does not exist."),
+    REPLY_NOT_FOUND("urn:phark:problem:reply-not-found", HttpStatus.NOT_FOUND,
+            "Reply not found", "The requested reply does not exist."),
+    DUPLICATE_REPORT("urn:phark:problem:duplicate-report", HttpStatus.CONFLICT,
+            "Duplicate report", "You have already reported this content."),
     MEDIA_NOT_FOUND("urn:phark:problem:media-not-found", HttpStatus.NOT_FOUND,
             "Media not found", "The requested media does not exist."),
     RESOURCE_NOT_FOUND("urn:phark:problem:resource-not-found", HttpStatus.NOT_FOUND,
@@ -49,7 +55,9 @@ public enum ApiErrorCode {
     UNSUPPORTED_MEDIA_TYPE("urn:phark:problem:unsupported-media-type", HttpStatus.UNSUPPORTED_MEDIA_TYPE,
             "Unsupported media type", "The request content type is not supported."),
     INTERNAL_ERROR("urn:phark:problem:internal-error", HttpStatus.INTERNAL_SERVER_ERROR,
-            "Internal server error", "An unexpected error occurred.");
+            "Internal server error", "An unexpected error occurred."),
+    RATE_LIMITED("urn:phark:problem:rate-limited", HttpStatus.TOO_MANY_REQUESTS,
+            "Rate limit exceeded", "Too many requests. Please try again later.");
 
     private final URI type;
     private final HttpStatus httpStatus;

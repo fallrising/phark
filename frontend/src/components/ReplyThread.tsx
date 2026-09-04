@@ -7,6 +7,7 @@ import { AuthorLink } from "@/components/AuthorLink"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { ReportControl } from "@/components/ReportControl"
 import type { Reply } from "@/types/post"
 
 interface ReplyThreadProps {
@@ -176,6 +177,14 @@ export function ReplyThread({
                   <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed">
                     {reply.content}
                   </p>
+                  <div className="mt-2">
+                    <ReportControl
+                      targetType="REPLY"
+                      targetId={reply.id}
+                      sessionAccount={sessionAccount}
+                      onAuthRequest={onAuthRequest}
+                    />
+                  </div>
                 </li>
               ))}
             </ol>

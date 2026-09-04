@@ -41,14 +41,22 @@ import org.springframework.web.multipart.MultipartFile;
 class PostServiceMediaTest {
 
     private static final String KEY = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg";
+    private static final String IP_HMAC = "a".repeat(64);
 
     private final PostRepository postRepository = mock(PostRepository.class);
     private final PostCursorCodec cursorCodec = mock(PostCursorCodec.class);
     private final ImageValidator imageValidator = new ImageValidator();
     private final MediaStorage mediaStorage = mock(MediaStorage.class);
     private final PostImagePersistenceService persistence = mock(PostImagePersistenceService.class);
+    private final AbuseSignalRecorder signalRecorder = mock(AbuseSignalRecorder.class);
     private final PostService service =
-            new PostService(postRepository, cursorCodec, imageValidator, mediaStorage, persistence);
+            new PostService(
+                    postRepository,
+                    cursorCodec,
+                    imageValidator,
+                    mediaStorage,
+                    persistence,
+                    signalRecorder);
 
     @BeforeEach
     void setUp() {
@@ -63,10 +71,12 @@ class PostServiceMediaTest {
                 new MockMultipartFile("image", "photo.jpg", "image/jpeg", jpeg);
         Post committed = postWithImage(42L);
         when(persistence.createOwnedWithImage(
-                        eq(10L), eq("hello image"), eq("home"), eq(KEY), any(ValidatedImage.class)))
+                        eq(10L), eq("hello image"), eq("home"), eq(KEY),
+                        any(ValidatedImage.class), eq(IP_HMAC)))
                 .thenReturn(committed);
 
-        Post result = service.createPostWithImage(10L, request(" hello image ", "home"), image);
+        Post result = service.createPostWithImage(
+                10L, request(" hello image ", "home"), image, IP_HMAC);
 
         assertThat(result).isEqualTo(committed);
         assertThat(result.image()).isNotNull();
@@ -74,7 +84,8 @@ class PostServiceMediaTest {
         ArgumentCaptor<ValidatedImage> captured = ArgumentCaptor.forClass(ValidatedImage.class);
         verify(persistence)
                 .createOwnedWithImage(
-                        eq(10L), eq("hello image"), eq("home"), eq(KEY), captured.capture());
+                        eq(10L), eq("hello image"), eq("home"), eq(KEY),
+                        captured.capture(), eq(IP_HMAC));
         ValidatedImage stored = captured.getValue();
         assertThat(stored.contentType()).isEqualTo("image/jpeg");
         assertThat(stored.extension()).isEqualTo("jpg");
@@ -87,7 +98,8 @@ class PostServiceMediaTest {
         order.verify(mediaStorage).store(eq(jpeg), eq("jpg"));
         order.verify(persistence)
                 .createOwnedWithImage(
-                        eq(10L), eq("hello image"), eq("home"), eq(KEY), any(ValidatedImage.class));
+                        eq(10L), eq("hello image"), eq("home"), eq(KEY),
+                        any(ValidatedImage.class), eq(IP_HMAC));
     }
 
     @Test
@@ -96,12 +108,14 @@ class PostServiceMediaTest {
                 new MockMultipartFile("image", "photo.gif", "image/gif", jpeg(20, 20));
 
         assertThatThrownBy(
-                        () -> service.createPostWithImage(10L, request("hello image", "home"), image))
+                        () -> service.createPostWithImage(
+                                10L, request("hello image", "home"), image, IP_HMAC))
                 .isInstanceOf(InvalidImageException.class);
 
         verify(mediaStorage, never()).store(any(), anyString());
         verify(persistence, never())
-                .createOwnedWithImage(anyLong(), anyString(), anyString(), anyString(), any());
+                .createOwnedWithImage(
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString());
     }
 
     @Test
@@ -110,12 +124,14 @@ class PostServiceMediaTest {
                 "image", "photo.jpg", "image/jpeg", new byte[5 * 1024 * 1024 + 1]);
 
         assertThatThrownBy(
-                        () -> service.createPostWithImage(10L, request("hello image", "home"), image))
+                        () -> service.createPostWithImage(
+                                10L, request("hello image", "home"), image, IP_HMAC))
                 .isInstanceOf(ImageTooLargeException.class);
 
         verify(mediaStorage, never()).store(any(), anyString());
         verify(persistence, never())
-                .createOwnedWithImage(anyLong(), anyString(), anyString(), anyString(), any());
+                .createOwnedWithImage(
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString());
     }
 
     @Test
@@ -126,24 +142,27 @@ class PostServiceMediaTest {
                 new MockMultipartFile("image", "photo.jpg", "image/jpeg", jpeg(20, 20));
 
         assertThatThrownBy(
-                        () -> service.createPostWithImage(10L, request("hello image", "home"), image))
+                        () -> service.createPostWithImage(
+                                10L, request("hello image", "home"), image, IP_HMAC))
                 .isSameAs(failure);
 
         verify(persistence, never())
-                .createOwnedWithImage(anyLong(), anyString(), anyString(), anyString(), any());
+                .createOwnedWithImage(
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString());
     }
 
     @Test
     void persistenceFailureCompensatesByDeletingStoredMediaAndRethrowsOriginal() throws Exception {
         IllegalStateException failure = new IllegalStateException("commit failed");
         when(persistence.createOwnedWithImage(
-                        anyLong(), anyString(), anyString(), anyString(), any()))
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString()))
                 .thenThrow(failure);
         MockMultipartFile image =
                 new MockMultipartFile("image", "photo.jpg", "image/jpeg", jpeg(20, 20));
 
         assertThatThrownBy(
-                        () -> service.createPostWithImage(10L, request("hello image", "home"), image))
+                        () -> service.createPostWithImage(
+                                10L, request("hello image", "home"), image, IP_HMAC))
                 .isSameAs(failure);
 
         verify(mediaStorage).delete(KEY);
@@ -154,14 +173,15 @@ class PostServiceMediaTest {
         IllegalStateException primary = new IllegalStateException("commit failed");
         MediaStorageException cleanup = new MediaStorageException("delete failed");
         when(persistence.createOwnedWithImage(
-                        anyLong(), anyString(), anyString(), anyString(), any()))
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString()))
                 .thenThrow(primary);
         doThrow(cleanup).when(mediaStorage).delete(KEY);
         MockMultipartFile image =
                 new MockMultipartFile("image", "photo.jpg", "image/jpeg", jpeg(20, 20));
 
         assertThatThrownBy(
-                        () -> service.createPostWithImage(10L, request("hello image", "home"), image))
+                        () -> service.createPostWithImage(
+                                10L, request("hello image", "home"), image, IP_HMAC))
                 .isSameAs(primary)
                 .satisfies(exception -> assertThat(primary.getSuppressed()).containsExactly(cleanup));
     }
@@ -173,12 +193,14 @@ class PostServiceMediaTest {
         when(image.getInputStream()).thenThrow(new IOException("storage device gone"));
 
         assertThatThrownBy(
-                        () -> service.createPostWithImage(10L, request("hello image", "home"), image))
+                        () -> service.createPostWithImage(
+                                10L, request("hello image", "home"), image, IP_HMAC))
                 .isInstanceOf(InvalidImageException.class);
 
         verify(mediaStorage, never()).store(any(), anyString());
         verify(persistence, never())
-                .createOwnedWithImage(anyLong(), anyString(), anyString(), anyString(), any());
+                .createOwnedWithImage(
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString());
     }
 
     @Test
@@ -206,14 +228,15 @@ class PostServiceMediaTest {
                     return KEY;
                 });
         when(persistence.createOwnedWithImage(
-                        anyLong(), anyString(), anyString(), anyString(), any()))
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString()))
                 .thenReturn(postWithImage(1L));
 
-        service.createPostWithImage(10L, request("hello image", "home"), image);
+        service.createPostWithImage(10L, request("hello image", "home"), image, IP_HMAC);
 
         assertThat(closed).isTrue();
         verify(persistence)
-                .createOwnedWithImage(anyLong(), anyString(), anyString(), anyString(), any());
+                .createOwnedWithImage(
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString());
     }
 
     @Test
@@ -232,12 +255,14 @@ class PostServiceMediaTest {
         };
 
         assertThatThrownBy(
-                        () -> service.createPostWithImage(10L, request("hello image", "home"), image))
+                        () -> service.createPostWithImage(
+                                10L, request("hello image", "home"), image, IP_HMAC))
                 .isInstanceOf(InvalidImageException.class);
 
         verify(mediaStorage, never()).store(any(), anyString());
         verify(persistence, never())
-                .createOwnedWithImage(anyLong(), anyString(), anyString(), anyString(), any());
+                .createOwnedWithImage(
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString());
     }
 
     @Test
@@ -256,12 +281,14 @@ class PostServiceMediaTest {
         };
 
         assertThatThrownBy(
-                        () -> service.createPostWithImage(10L, request("hello image", "home"), image))
+                        () -> service.createPostWithImage(
+                                10L, request("hello image", "home"), image, IP_HMAC))
                 .isInstanceOf(InvalidImageException.class);
 
         verify(mediaStorage, never()).store(any(), anyString());
         verify(persistence, never())
-                .createOwnedWithImage(anyLong(), anyString(), anyString(), anyString(), any());
+                .createOwnedWithImage(
+                        anyLong(), anyString(), anyString(), anyString(), any(), anyString());
     }
 
     private static Post postWithImage(long postId) {
