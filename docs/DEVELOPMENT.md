@@ -626,6 +626,10 @@ members 必須忽略。
 | `RESOURCE_NOT_FOUND` | 404 | API route/resource 不存在 |
 | `METHOD_NOT_ALLOWED` | 405 | HTTP method 不支援 |
 | `HANDLE_UNAVAILABLE` | 409 | canonical handle 已被註冊 |
+| `DUPLICATE_REPORT` | 409 | 同一 account 對同一 target 已有一筆 unexpired report |
+| `INVALID_REPLY_ID` | 400 | reply ID 不是正整數（含 type mismatch） |
+| `REPLY_NOT_FOUND` | 404 | 指定回覆不存在 |
+| `RATE_LIMITED` | 429 | 命中 fixed-window quota；帶 `RateLimit-*` 與 `Retry-After` header |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | request Content-Type 不支援 |
 | `INTERNAL_ERROR` | 500 | 未預期錯誤；不回傳內部 exception details |
 
@@ -683,6 +687,114 @@ Request ID 只用於關聯 response 與 server log，不是 authentication 或�
   items 標為 read，並套用 server 回傳的 `readThroughCursor` 與 `unreadCount`；失敗時
   不 optimistic clear，保留 badge 並顯示錯誤。
 - 本輪不 polling；進入通知頁、mark read 或 session identity 改變時才 refresh。
+
+### `POST /api/posts/{postId}/reports` 與 `POST /api/replies/{replyId}/reports`（SDD-011）
+
+需 authenticated session 與有效 CSRF。Target 與 target type 只來自 route path；body
+只接受一個 supported reason，**不能 retarget**。成功回 `201 Created` 與
+`Cache-Control: private, no-store`，回傳固定六欄的 redacted representation。**沒有** public
+report-read/read-update/delete API、moderator role、moderation queue 或 operator
+UI：report 是 intake-only，public 面 immutable `RECEIVED`，到期由 retention 刪除。
+
+```http
+POST /api/posts/17/reports
+{ "reason": "SPAM" }
+```
+
+| 欄位 | 規則 |
+|------|------|
+| `reason` | 必填；僅 `SPAM`、`HARASSMENT`、`HATE_OR_VIOLENCE`、`SEXUAL_CONTENT`、`OTHER`；不接受自由文字 |
+
+Success（`201`）：
+
+```json
+{
+  "id": 42,
+  "targetType": "POST",
+  "targetId": 17,
+  "reason": "SPAM",
+  "status": "RECEIVED",
+  "createdAt": "2026-09-04T12:00:00Z"
+}
+```
+
+規則與錯誤：
+
+- 同一 account 對同一 target 只能有一筆 **unexpired** report；重複（含換 reason）→
+  `409 DUPLICATE_REPORT`，原 report/signal 不變。不同 account 對同一 target 各自
+  成立。
+- 該 reporter/target 的 expired rows 會在 create transaction 內先刪除再插入。
+- Reporter 可以檢舉自己的內容；report 是 intake，不是 policy verdict。
+- `postId`/`replyId` 非正整數（含 non-numeric route ID）→ `400 INVALID_POST_ID` /
+  `400 INVALID_REPLY_ID`；target 不存在 → `404 POST_NOT_FOUND` / `404
+  REPLY_NOT_FOUND`；unsupported/missing `reason` → 既有 `VALIDATION_FAILED` shape。
+- Anonymous → `401 AUTHENTICATION_REQUIRED`；缺/錯 CSRF → `403 CSRF_TOKEN_INVALID`；
+  兩者都在 MVC 之前發生，**不寫 report、signal 或 quota bucket**。
+- Nested report routes 只吃 `REPORT_WRITE` account/IP quota，不吃 `CONTENT_WRITE`
+  quota。
+
+### Rate limiting 契約（SDD-011）
+
+Rate limiting 是 abuse resistance，不是 authentication/authorization。只限
+authenticated mutation（依 policy）與 register/login；public read、health、CSRF、
+logout、profile edit、notification read 不在本輪限流範圍。App 維持單一 writer；
+fixed window 允許 boundary 瞬間最多 **2× nominal quota** 的 burst；shared IPv4 NAT
+與 IPv6 /64 共享同一 quota、可能產生 collateral throttling——這是第一版單 VPS 的
+accepted limit。`RateLimit-Reset` 是 aligned window 的**剩餘秒數**，本專案**不宣稱
+IETF RateLimit draft conformance**。
+
+| Scope | Requests | Subject | Limit | Window |
+|---|---|---:|---:|---:|
+| `REGISTER` | `POST /api/accounts` | IP | 5 | 1 hour |
+| `LOGIN` | `POST /api/auth/login` | IP | 10 | 15 minutes |
+| `CONTENT_WRITE` | `POST /api/posts`, `POST /api/posts/{id}/replies` | account | 20 | 1 minute |
+| `CONTENT_WRITE` | 同上 | IP | 60 | 1 minute |
+| `SOCIAL_WRITE` | like/unlike, repost/unrepost | account | 120 | 1 minute |
+| `SOCIAL_WRITE` | 同上 | IP | 240 | 1 minute |
+| `REPORT_WRITE` | post/reply report creation | account | 10 | 1 hour |
+| `REPORT_WRITE` | 同上 | IP | 20 | 1 hour |
+
+- 所有 window 都是 **UTC epoch-aligned fixed window**；counter key 是
+  `(scope, subject_kind, subject_hmac, window_start_epoch)`。
+- Account policy 永遠先於 IP policy 評估；authenticated request 的 account 與 IP
+  quota 在**同一 SQLite transaction** 保留，任一 exhausted 即 rollback 整個
+  reservation，**被拒的 request 不部分消耗另一 policy**。
+- Allowed 時 binding policy 是 remaining/limit 比例最小者（tie：最短 reset，再來
+  account 在 IP 前）；denied 時 binding 是 stable 順序中第一個 exhausted 的 policy、
+  public remaining 為 0。Reset 一律 `>= 1` 秒。
+- 第 `limit + 1` 個 request 被拒：`429 application/problem+json`、code
+  `RATE_LIMITED`（`urn:phark:problem:rate-limited`）、`Retry-After` =
+  `RateLimit-Reset`、`Cache-Control: private, no-store`；body 不揭露 scope、
+  subject kind/hmac、IP、account ID 或內部 counter。
+- 通過 policy 的 response（含之後 controller 回 4xx/5xx）一律帶：
+  `RateLimit-Limit`、`RateLimit-Remaining`（永不小於 0）、`RateLimit-Reset`。被
+  authentication/CSRF 擋掉的 401/403 **不帶** rate-limit header、不寫 bucket。
+  Accepted 後 controller 的 validation/conflict/not-found 仍揭露 consumed quota；
+  duplicate report 也消耗一單位 `REPORT_WRITE`。
+
+### 濫用信號、secret 與 retention（SDD-011）
+
+- **Raw IP 永不儲存、永不 log、永不回傳**。Signal 只存 action kind、authenticated
+  actor ID、exactly one target/report reference、keyed IP HMAC 與
+  created/expiry；不存 user agent、forwarded-header chain、credentials、session ID、
+  CSRF token、content copy、report text 或 risk score。
+- Account/IP subjects 都是 **domain-separated HMAC-SHA-256**：account 為
+  `HMAC-SHA-256(secret, "phark-account-v1:" + accountId)`；IP 以 domain prefix +
+  family byte + canonical network bytes 輸入，輸出 lowercase 64-hex。Raw remote
+  address 只存在 request boundary；持久層只接觸 HMAC，public API 不回傳它。
+- **Production 必須提供 `APP_ABUSE_IP_HMAC_SECRET`**：unpadded base64url、decode
+  後恰 32 bytes 的隨機值（產生命令見 `deploy/templates/deck/.env.example`）。prod
+  profile startup 拒絕 missing/malformed/short/committed dev 值（fail-closed）；
+  test/development 才用確定的非產線值。
+- **Rotation 有意的後果**：新舊 HMAC 不可關聯、effective IP/account partition 全部
+  重設、舊 rows 依 retention 自然老化；本輪不做 dual-key rotation。
+- **Retention**：abuse signals 30 天、content reports 180 天、rate-limit buckets 於
+  window end 後 24 小時；cleanup 在 **startup** 與每天 **03:00 UTC**（cron
+  `0 0 3 * * *`，zone UTC）執行、idempotent；create-time 也會清該 reporter/target
+  的 expired rows。Deletion 不會從 moderation table cascade 進 accounts/posts/
+  replies/interactions/notifications/media。
+- 沒有 moderator/admin workflow、anonymous report、free-text report、appeals、report
+  status query 或 reporter-to-reporter visibility。
 
 ## 環境變數
 

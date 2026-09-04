@@ -1,6 +1,6 @@
 # Phark 產品任務樹
 
-> 最後更新：2026-09-03
+> 最後更新：2026-09-04
 
 狀態：`[x]` 完成、`[~]` 進行中、`[ ]` 待辦。優先級由 P0 到 P2。
 
@@ -54,10 +54,10 @@
   - [x] object storage abstraction
   - [x] upload validation
   - [x] image rendering
-- [ ] **SDD-011 — Moderation and abuse controls**
-  - [ ] rate limiting
-  - [ ] content reporting
-  - [ ] author/IP abuse signals
+- [x] **SDD-011 — Moderation and abuse controls**
+  - [x] rate limiting
+  - [x] content reporting
+  - [x] author/IP abuse signals
 - [ ] **SDD-012 — Production durability**
   - [ ] SQLite online backup
   - [ ] metrics and alerts

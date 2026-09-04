@@ -142,4 +142,5 @@ Browser client 啟動時先並行取得 CSRF token 與 session，所有 `POST`�
 - [x] Per-account 通知中心與 unread badge
 - [x] Original post 全文搜尋（FTS5、`s1:` cursor 與 `/search`）
 - [x] 媒體附件（SDD-010：multipart create、公開 media GET、lazy rendering；見 [docs/specs/010-media-attachments/spec.md](docs/specs/010-media-attachments/spec.md)）
+- [x] 濫用與審核控制（SDD-011：restart-persistent fixed-window rate limits 與 `429 RATE_LIMITED`、authenticated content reports、author/IP 最小化信號與 30/180/24h retention；見 [docs/specs/011-moderation-abuse-controls/spec.md](docs/specs/011-moderation-abuse-controls/spec.md)）
 - [ ] VPS + Traefik + CI/CD 上線（見 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）
