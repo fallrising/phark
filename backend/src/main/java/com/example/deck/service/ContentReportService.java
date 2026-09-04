@@ -24,42 +24,52 @@ public class ContentReportService {
     private final ContentReportRepository reportRepository;
     private final PostRepository postRepository;
     private final ReplyRepository replyRepository;
+    private final AbuseSignalRecorder signalRecorder;
     private final Clock clock;
 
     @Autowired
     public ContentReportService(ContentReportRepository reportRepository, PostRepository postRepository,
-                                ReplyRepository replyRepository) {
-        this(reportRepository, postRepository, replyRepository, Clock.systemUTC());
+                                ReplyRepository replyRepository, AbuseSignalRecorder signalRecorder) {
+        this(reportRepository, postRepository, replyRepository, signalRecorder, Clock.systemUTC());
     }
 
     ContentReportService(ContentReportRepository reportRepository, PostRepository postRepository,
-                         ReplyRepository replyRepository, Clock clock) {
+                         ReplyRepository replyRepository, AbuseSignalRecorder signalRecorder, Clock clock) {
         this.reportRepository = reportRepository;
         this.postRepository = postRepository;
         this.replyRepository = replyRepository;
+        this.signalRecorder = signalRecorder;
         this.clock = clock;
     }
 
     @Transactional
-    public ContentReport reportPost(long postId, long reporterId, CreateContentReportRequest request) {
+    public ContentReport reportPost(
+            long postId, long reporterId, CreateContentReportRequest request, String ipHmac) {
         Instant createdAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         long now = createdAt.getEpochSecond();
         if (postId <= 0) throw new ApiException(ApiErrorCode.INVALID_POST_ID);
         if (!postRepository.existsById(postId)) throw new ApiException(ApiErrorCode.POST_NOT_FOUND);
         reportRepository.deleteExpiredPostReport(reporterId, postId, now);
         if (reportRepository.hasLivePostReport(reporterId, postId, now)) throw new ApiException(ApiErrorCode.DUPLICATE_REPORT);
-        return insert(reporterId, ContentReportTargetType.POST, postId, request, createdAt);
+        ContentReport report = insert(
+                reporterId, ContentReportTargetType.POST, postId, request, createdAt);
+        signalRecorder.recordReportCreated(reporterId, report.id(), ipHmac);
+        return report;
     }
 
     @Transactional
-    public ContentReport reportReply(long replyId, long reporterId, CreateContentReportRequest request) {
+    public ContentReport reportReply(
+            long replyId, long reporterId, CreateContentReportRequest request, String ipHmac) {
         Instant createdAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         long now = createdAt.getEpochSecond();
         if (replyId <= 0) throw new ApiException(ApiErrorCode.INVALID_REPLY_ID);
         if (!replyRepository.findById(replyId).isPresent()) throw new ApiException(ApiErrorCode.REPLY_NOT_FOUND);
         reportRepository.deleteExpiredReplyReport(reporterId, replyId, now);
         if (reportRepository.hasLiveReplyReport(reporterId, replyId, now)) throw new ApiException(ApiErrorCode.DUPLICATE_REPORT);
-        return insert(reporterId, ContentReportTargetType.REPLY, replyId, request, createdAt);
+        ContentReport report = insert(
+                reporterId, ContentReportTargetType.REPLY, replyId, request, createdAt);
+        signalRecorder.recordReportCreated(reporterId, report.id(), ipHmac);
+        return report;
     }
 
     private ContentReport insert(long reporterId, ContentReportTargetType type, long targetId,
