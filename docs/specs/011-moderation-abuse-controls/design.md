@@ -93,7 +93,7 @@ SQL; all values are bound parameters.
 
 ### `abuse_signals`
 
-- Surrogate ID, action kind, nullable authenticated actor FK, exactly one of
+- Surrogate ID, action kind, non-null authenticated actor FK, exactly one of
   post/reply/report FK, keyed IP HMAC, created/expiry timestamps.
 - CHECK constraints bind each action to its one valid reference shape.
 - Unique partial indexes allow only one origin signal per newly created post or

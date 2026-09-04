@@ -13,11 +13,11 @@
 
 ## Phase 1 — Persistent Schema
 
-- [ ] RED: add V10 clean/populated migration and constraint tests.
-- [ ] GREEN: add the smallest additive V10 migration.
-- [ ] Verify clean V1→V10, populated V9→V10, FK/unique/CHECK behavior, FTS, images,
+- [x] RED: add V10 clean/populated migration and constraint tests.
+- [x] GREEN: add the smallest additive V10 migration.
+- [x] Verify clean V1→V10, populated V9→V10, FK/unique/CHECK behavior, FTS, images,
   history, and `PRAGMA integrity_check`.
-- [ ] Prove a failed V10 leaves V9 history/schema intact.
+- [x] Prove a failed V10 leaves V9 history/schema intact.
 
 ## Phase 2 — Rate Limiting and Privacy Boundary
 
