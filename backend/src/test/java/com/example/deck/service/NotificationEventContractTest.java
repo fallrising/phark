@@ -78,7 +78,8 @@ class NotificationEventContractTest {
         Post post = newOwnedPost(bob, "Original content");
 
         Reply reply = replyService.createReply(
-                post.id(), alice.id(), new CreateReplyRequest("Ship the boring fix first."));
+                post.id(), alice.id(), new CreateReplyRequest("Ship the boring fix first."),
+                "a".repeat(64));
         postLikeService.like(post.id(), alice.id());
         postRepostService.repost(post.id(), alice.id());
 
@@ -108,11 +109,13 @@ class NotificationEventContractTest {
         Post owned = newOwnedPost(bob, "Self post");
         Post legacy = newLegacyPost("Legacy Author", "Legacy post");
 
-        replyService.createReply(owned.id(), bob.id(), new CreateReplyRequest("self reply"));
+        replyService.createReply(
+                owned.id(), bob.id(), new CreateReplyRequest("self reply"), "a".repeat(64));
         postLikeService.like(owned.id(), bob.id());
         postRepostService.repost(owned.id(), bob.id());
 
-        replyService.createReply(legacy.id(), alice.id(), new CreateReplyRequest("legacy reply"));
+        replyService.createReply(
+                legacy.id(), alice.id(), new CreateReplyRequest("legacy reply"), "a".repeat(64));
         postLikeService.like(legacy.id(), alice.id());
         postRepostService.repost(legacy.id(), alice.id());
 
@@ -194,9 +197,11 @@ class NotificationEventContractTest {
         try {
             SoftAssertions softly = new SoftAssertions();
             softly.assertThatThrownBy(() -> replyService.createReply(
-                            post.id(), alice.id(), new CreateReplyRequest("Atomic reply")))
+                            post.id(), alice.id(), new CreateReplyRequest("Atomic reply"),
+                            "a".repeat(64)))
                     .isInstanceOf(DataAccessException.class);
             softly.assertThat(replyRowCount(post.id(), alice.id())).isZero();
+            softly.assertThat(replySignalCount(alice.id())).isZero();
 
             softly.assertThatThrownBy(() -> postLikeService.like(post.id(), alice.id()))
                     .isInstanceOf(DataAccessException.class);
@@ -288,6 +293,16 @@ class NotificationEventContractTest {
                         SELECT COUNT(*) FROM replies
                         WHERE post_id = :postId AND author_account_id = :accountId""")
                 .param("postId", postId)
+                .param("accountId", accountId)
+                .query(Long.class)
+                .single();
+    }
+
+    private long replySignalCount(long accountId) {
+        return jdbcClient.sql("""
+                        SELECT COUNT(*) FROM abuse_signals
+                        WHERE actor_account_id = :accountId
+                          AND action_kind = 'REPLY_CREATED'""")
                 .param("accountId", accountId)
                 .query(Long.class)
                 .single();
