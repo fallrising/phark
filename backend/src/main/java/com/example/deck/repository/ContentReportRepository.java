@@ -38,6 +38,11 @@ public class ContentReportRepository {
                 .param("reporterId", reporterId).param("replyId", replyId).param("nowEpoch", nowEpoch).update();
     }
 
+    public int deleteExpired(long currentEpochSecond) {
+        return jdbcClient.sql("DELETE FROM content_reports WHERE expires_at_epoch <= :now")
+                .param("now", currentEpochSecond).update();
+    }
+
     public boolean hasLivePostReport(long reporterId, long postId, long nowEpoch) {
         return count("post_id", reporterId, postId, nowEpoch) > 0;
     }
